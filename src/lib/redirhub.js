@@ -1,59 +1,40 @@
-// The RedirHub API, signed in with the user's API token.
+// What the extension does in RedirHub, through MCP tools. `call(name, args)` calls one tool with
+// a fresh access token (src/background.js) and returns its result.
 
-import { linkBody } from "./rules.js";
+import { DASHBOARD_URL } from "./config.js";
+import { redirectArgs } from "./rules.js";
 
-export const API_BASE = "https://api.redirhub.com/v1";
-export const URL_API_TOKENS = "https://account.redirhub.com/user/api-tokens";
-export const URL_REGISTER = "https://dash.redirhub.com/login";
-export const URL_DASHBOARD = "https://dash.redirhub.com";
+export const URL_REGISTER = `${DASHBOARD_URL}/login`;
 
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-  }
+/** The signed-in user and the workspace the connection is for. */
+export async function getAccount(call) {
+  const [account, workspace] = await Promise.all([call("get-account"), call("get-workspace")]);
+  return { name: account.name, email: account.email, workspace: workspace.name || null };
 }
 
-async function call(token, path, init = {}) {
-  let response;
-  try {
-    response = await fetch(API_BASE + path, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...(init.headers || {}),
-      },
-    });
-  } catch {
-    throw new ApiError("RedirHub could not be reached. Check your connection.", 0);
-  }
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = body.errors ? Object.values(body.errors).flat()[0] : null;
-    throw new ApiError(detail || body.message || `RedirHub answered ${response.status}`, response.status);
-  }
-  return body;
+/** The link of the workspace that answers for `source` (host and path), or null. */
+async function findLink(call, source) {
+  const page = await call("list-links", { search: source, per_page: 50 });
+  return (page.data || []).find((link) => link.url === source) || null;
 }
 
-export async function getAccount(token) {
-  const account = await call(token, "/account");
-  const workspace = account.current_workspace;
-  return {
-    name: account.name,
-    email: account.email,
-    workspace: workspace && typeof workspace === "object" ? workspace.name : null,
-  };
-}
-
-/** Creates one redirect per rule; a failure does not stop the others. */
-export async function createRedirects(token, rules, note) {
+/**
+ * Saves one redirect per rule: a source the workspace already redirects (say, one hop of the
+ * chain is a RedirHub link) is updated, any other is created. A failure does not stop the others.
+ */
+export async function saveRedirects(call, rules, note) {
   const results = [];
   for (const rule of rules) {
+    const { url, destination, type } = redirectArgs(rule, note);
     try {
-      const body = await call(token, "/links", { method: "POST", body: JSON.stringify(linkBody(rule, note)) });
-      results.push({ rule, ok: true, id: body.data?.[0]?.id });
+      const existing = await findLink(call, url);
+      if (existing) {
+        await call("update-link", { id: existing.id, destination, type, note });
+        results.push({ rule, ok: true, id: existing.id, updated: true });
+      } else {
+        const created = await call("create-redirect", { url, destination, type, note });
+        results.push({ rule, ok: true, id: created.id, updated: false });
+      }
     } catch (error) {
       results.push({ rule, ok: false, error: error.message });
     }

@@ -1,9 +1,11 @@
-import { URL_API_TOKENS, URL_REGISTER } from "./lib/redirhub.js";
+import { connect } from "./connect.js";
+import { URL_CONNECTIONS } from "./lib/config.js";
+import { URL_REGISTER } from "./lib/redirhub.js";
 
 const $ = (id) => document.getElementById(id);
 const send = (message) => chrome.runtime.sendMessage(message);
 
-$("tokens").href = URL_API_TOKENS;
+$("connections").href = URL_CONNECTIONS;
 $("register").href = URL_REGISTER;
 
 function show(account) {
@@ -15,18 +17,21 @@ function show(account) {
   $("initials").textContent = (account.name || account.email).split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
-$("form").addEventListener("submit", async (event) => {
-  event.preventDefault();
+async function startConnect() {
+  const button = $("connect-button");
+  button.disabled = true;
   $("error").hidden = true;
-  const answer = await send({ type: "sign-in", token: $("token").value.trim() });
-  if (!answer.ok) {
-    $("error").textContent = answer.error;
+  try {
+    show(await connect());
+  } catch (error) {
+    $("error").textContent = error.message;
     $("error").hidden = false;
-    return;
+  } finally {
+    button.disabled = false;
   }
-  $("token").value = "";
-  show(answer.account);
-});
+}
+
+$("connect-button").addEventListener("click", startConnect);
 
 $("signout").addEventListener("click", async () => {
   await send({ type: "sign-out" });
@@ -39,8 +44,18 @@ $("clear").addEventListener("click", async () => {
   $("clear").textContent = "Cleared";
 });
 
+// The connection can also end while this page is open (a refused token).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.auth) show(changes.auth.newValue?.account || null);
+});
+
 (async () => {
   const [auth, notFound] = await Promise.all([send({ type: "get-auth" }), send({ type: "get-not-found", host: "" })]);
   show(auth.account);
   $("capture").checked = notFound.settings?.capture404 ?? true;
+  // Opened from the popup's Connect: start right away.
+  if (location.hash === "#connect" && !auth.account) {
+    history.replaceState(null, "", location.pathname);
+    startConnect();
+  }
 })();

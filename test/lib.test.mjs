@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { analyzeChain } from "../src/lib/chain.js";
 import { suggestDestination } from "../src/lib/suggest.js";
-import { linkBody, rulesToCsv } from "../src/lib/rules.js";
+import { redirectArgs, rulesToCsv } from "../src/lib/rules.js";
 
 const hop = (url, status, kind = "server") => ({ url, status, kind });
 
@@ -50,10 +50,10 @@ test("a 404 is sent to the most similar live page, else its parent, else home", 
   assert.equal(suggestDestination("https://a.com/qq", live).reason, "home");
 });
 
-test("rules export as RedirHub sources and link bodies", () => {
+test("rules export as RedirHub sources and create-redirect arguments", () => {
   const rules = [{ source: "https://www.a.com/old?x=1", destination: "https://www.a.com/new", type: "301" }];
-  assert.equal(rulesToCsv(rules), "source,destination,type\nwww.a.com/old?x=1,https://www.a.com/new,301\n");
-  assert.deepEqual(linkBody(rules[0], "why"), {
-    handler: "redirect", host: "www.a.com", url: "www.a.com/old?x=1", destination: "https://www.a.com/new", type: "301", note: "why",
+  assert.equal(rulesToCsv(rules), "source URL,destination,type\nwww.a.com/old?x=1,https://www.a.com/new,301\n");
+  assert.deepEqual(redirectArgs(rules[0], "why"), {
+    url: "www.a.com/old?x=1", destination: "https://www.a.com/new", type: "301", note: "why",
   });
 });

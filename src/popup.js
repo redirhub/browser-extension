@@ -111,11 +111,11 @@ function summaryOf({ hops, analysis }) {
 
 async function fixChain(rule, button) {
   button.disabled = true;
-  const answer = await send({ type: "create-redirects", rules: [rule], note: "Added from the browser extension to replace a redirect chain with one 301." });
+  const answer = await send({ type: "save-redirects", rules: [rule], note: "Added from the browser extension to replace a redirect chain with one 301." });
   const result = answer.ok ? answer.results[0] : { ok: false, error: answer.error };
   if (result.ok) {
     button.replaceChildren(icon("check"), "Saved in RedirHub");
-    toast(`Saved: ${shortUrl(rule.source)} now goes straight to the final page.`, "success");
+    toast(`${result.updated ? "Updated" : "Saved"}: ${shortUrl(rule.source)} now goes straight to the final page.`, "success");
   } else {
     button.disabled = false;
     toast(`RedirHub could not save it: ${result.error}`);
@@ -212,7 +212,7 @@ function selectedRules() {
 
 async function importRules() {
   const rules = selectedRules();
-  const answer = await send({ type: "create-redirects", rules, note: "404 caught by the browser extension while browsing the site." });
+  const answer = await send({ type: "save-redirects", rules, note: "404 caught by the browser extension while browsing the site." });
   if (!answer.ok) return toast(answer.error);
   const saved = answer.results.filter((r) => r.ok);
   const failed = answer.results.filter((r) => !r.ok);
@@ -261,7 +261,7 @@ function renderNotFound() {
       s.total > s.checked ? ` of ${s.total}` : "",
       `: ${s.broken.length} broken`,
       s.redirected.length ? `, ${s.redirected.length} through a redirect (link to the final URL instead)` : "",
-      s.unchecked.length ? `, ${s.unchecked.length} could not be checked (sign-in or bot protection)` : "",
+      s.unchecked.length ? `, ${s.unchecked.length} could not be checked (sign-in, bot protection or a network error)` : "",
       ".",
     ].join("")));
     if (s.redirected?.length) view.append(redirectedLinks(s.redirected));
@@ -354,8 +354,10 @@ async function main() {
 
   $("tab-chain").onclick = () => selectTab("chain");
   $("tab-404").onclick = () => selectTab("404");
-  $("account").onclick = () => chrome.runtime.openOptionsPage();
-  $("gate-connect").onclick = () => chrome.runtime.openOptionsPage();
+  // Signing in runs on the options page, which stays open while the user is on RedirHub.
+  const connect = () => chrome.tabs.create({ url: chrome.runtime.getURL("src/options.html#connect") }).then(() => window.close());
+  $("account").onclick = () => (state.account ? chrome.runtime.openOptionsPage() : connect());
+  $("gate-connect").onclick = connect;
   $("gate-register").onclick = () => chrome.tabs.create({ url: URL_REGISTER });
   $("gate-close").onclick = () => ($("gate").hidden = true);
   $("gate-icon").append(icon("lock", 22));

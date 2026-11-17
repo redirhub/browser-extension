@@ -4,7 +4,9 @@
 
 import { analyzeChain } from "./lib/chain.js";
 import { suggestDestination } from "./lib/suggest.js";
-import { createRedirects, getAccount } from "./lib/redirhub.js";
+import { callTool } from "./lib/mcp.js";
+import { needsRefresh, refreshTokens } from "./lib/oauth.js";
+import { getAccount, saveRedirects } from "./lib/redirhub.js";
 
 const FILTER = { urls: ["http://*/*", "https://*/*"], types: ["main_frame"] };
 const KEEP_HEADERS = ["server", "location", "x-redirect-by", "x-powered-by", "cache-control", "non-authoritative-reason"];
@@ -302,6 +304,40 @@ async function paintBadge(tabId, state) {
   }
 }
 
+// ---------- the RedirHub connection ----------
+//
+// The options page signs in (src/connect.js) and hands the tokens here. Every call to RedirHub
+// goes through `call`, which refreshes the access token when it is about to expire. A refused
+// refresh or token ends the connection: the user connects again.
+
+/** The access token to use now, refreshed first when it expires within a minute. */
+function freshAccess() {
+  return update("local", "auth", async (auth) => {
+    if (!auth) throw new Error("Connect your RedirHub account first.");
+    if (!needsRefresh(auth.tokens)) return auth;
+    const { oauthClient } = await chrome.storage.local.get("oauthClient");
+    try {
+      const tokens = await refreshTokens({ token_endpoint: oauthClient.tokenEndpoint }, { clientId: oauthClient.id, refresh: auth.tokens.refresh });
+      return { ...auth, tokens };
+    } catch {
+      return undefined;
+    }
+  }).then((auth) => {
+    if (!auth) throw new Error("Your RedirHub connection ended. Connect again.");
+    return auth.tokens.access;
+  });
+}
+
+/** Calls one RedirHub MCP tool as the connected user. */
+async function call(name, args) {
+  try {
+    return await callTool(await freshAccess(), name, args);
+  } catch (error) {
+    if (error.unauthorized) await chrome.storage.local.remove("auth");
+    throw error;
+  }
+}
+
 // ---------- messages from the popup, options page and content script ----------
 
 const handlers = {
@@ -335,18 +371,18 @@ const handlers = {
     const { auth } = await chrome.storage.local.get("auth");
     return { account: auth?.account || null };
   },
-  async "sign-in"({ token }) {
-    const account = await getAccount(token);
-    await chrome.storage.local.set({ auth: { token, account } });
+  async "signed-in"({ tokens }) {
+    const account = await getAccount((name, args) => callTool(tokens.access, name, args));
+    await chrome.storage.local.set({ auth: { tokens, account } });
     return { account };
   },
   async "sign-out"() {
     await chrome.storage.local.remove("auth");
   },
-  async "create-redirects"({ rules, note }) {
+  async "save-redirects"({ rules, note }) {
     const { auth } = await chrome.storage.local.get("auth");
-    if (!auth?.token) return { needsSignIn: true };
-    return { results: await createRedirects(auth.token, rules, note) };
+    if (!auth) return { needsSignIn: true };
+    return { results: await saveRedirects(call, rules, note) };
   },
   async "clear-data"() {
     const all = await chrome.storage.local.get(null);
