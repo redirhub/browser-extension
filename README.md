@@ -33,7 +33,7 @@ No build step and no dependencies: Chrome loads the folder as it is.
 | `src/background.js` | Service worker: builds chains from webRequest/webNavigation, catches 404s, checks links, talks to the API. |
 | `src/content.js` | Reports meta refresh tags; collects a page's links for the link check. |
 | `src/popup.*`, `src/options.*`, `src/ui.css` | The popup and the settings page. |
-| `src/lib/` | Pure logic, unit-tested in `tests/extension.test.mts` (`npm test` at the root). |
+| `src/lib/` | Pure logic, unit-tested in `test/` (`npm test`). |
 | `e2e/` | A test site and a run that loads the extension in Chromium and screenshots every state. |
 | `scripts/`, `store/` | The store ZIP, the store images and the listing text. |
 
@@ -45,8 +45,8 @@ No build step and no dependencies: Chrome loads the folder as it is.
 ## End-to-end run
 
 ```bash
-node extension/e2e/server.mjs &        # acme-shop.test on ports 80/443, plus a stand-in RedirHub API
-node extension/e2e/run.mjs /tmp/shots  # Chromium with the extension; prints what each popup said
+node e2e/server.mjs &        # acme-shop.test on ports 80/443, plus a stand-in RedirHub API
+node e2e/run.mjs /tmp/shots  # Chromium with the extension; prints what each popup said
 ```
 
 The run resolves `*.test` and `api.redirhub.com` to the local server, so it
@@ -54,8 +54,8 @@ never touches the real API. Signing in uses the token `test-token`.
 
 ## Publishing
 
-`npm --prefix extension run pack` builds the store ZIP in `dist/`;
-`node extension/scripts/store-assets.mjs` takes the five store screenshots in a
+`npm run pack` builds the store ZIP in `dist/`;
+`node scripts/store-assets.mjs` takes the five store screenshots in a
 real Chrome window on live sites (Apple, HP, redirhub.com; needs Xvfb and
 ImageMagick, and `CA_BUNDLE` behind an HTTPS proxy) and draws the promo tile. Listing text, permission justifications, data disclosures and
 the privacy policy section are in `store/LISTING.md`. Raise `version` in

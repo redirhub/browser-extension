@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "pack": "node scripts/pack.mjs",
+    "test": "node --test test/*.test.mjs",
     "e2e": "node e2e/run.mjs",
+    "pack": "node scripts/pack.mjs",
     "store-assets": "node scripts/store-assets.mjs"
   }
 }

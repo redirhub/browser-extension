@@ -1,5 +1,5 @@
 // Builds the ZIP the Chrome Web Store takes: manifest, code and icons only.
-//   npm --prefix extension run pack   ->  extension/dist/redirhub-extension-<version>.zip
+//   npm run pack   ->  dist/redirhub-extension-<version>.zip
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";

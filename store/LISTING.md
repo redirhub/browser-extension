@@ -1,7 +1,7 @@
 # Chrome Web Store listing
 
 Everything the Developer Dashboard asks for, ready to paste. Upload
-`dist/redirhub-extension-<version>.zip` (`npm --prefix extension run pack`).
+`dist/redirhub-extension-<version>.zip` (`npm run pack`).
 
 ## Store listing tab
 

@@ -2,7 +2,7 @@
 // five 1280x800 screenshots with the extension's real toolbar icon, badge and
 // popup, and the 440x280 promo tile. Writes store/.
 //
-//   node extension/scripts/store-assets.mjs [--keep <dir>]   (--keep also saves 2x originals)
+//   node scripts/store-assets.mjs [--keep <dir>]   (--keep also saves 2x originals)
 //
 // Needs Xvfb and ImageMagick. Behind an HTTPS proxy (HTTPS_PROXY), set
 // CA_BUNDLE to the proxy's CA file so pages load with a normal padlock.
