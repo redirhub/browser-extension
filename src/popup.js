@@ -354,7 +354,8 @@ async function main() {
 
   $("tab-chain").onclick = () => selectTab("chain");
   $("tab-404").onclick = () => selectTab("404");
-  const connect = () => send({ type: "connect-start" }).then(() => window.close());
+  // Signing in runs on the options page, which stays open while the user is on RedirHub.
+  const connect = () => chrome.tabs.create({ url: chrome.runtime.getURL("src/options.html#connect") }).then(() => window.close());
   $("account").onclick = () => (state.account ? chrome.runtime.openOptionsPage() : connect());
   $("gate-connect").onclick = connect;
   $("gate-register").onclick = () => chrome.tabs.create({ url: URL_REGISTER });

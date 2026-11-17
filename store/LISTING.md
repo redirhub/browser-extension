@@ -37,7 +37,7 @@ WHAT IT FLAGS
 • Each 404 comes with a suggested destination: the most similar live page of the site, its parent, or the home page
 
 FIX IT IN REDIRHUB
-Checks are free and need no account. Connect a RedirHub account to:
+Checks are free and need no account. Connect a RedirHub account (you sign in on RedirHub and choose what the extension may do) to:
 • Replace a whole chain with one 301 in a click
 • Create 301s for the 404s you caught, in bulk
 • Export them as a CSV for RedirHub's bulk import
@@ -66,15 +66,16 @@ Shows the redirects and 404 errors of the pages the user visits, and lets the us
 |---|---|
 | `webRequest` | Reads the status code and redirect target of each top-level page request to show the redirect chain and to detect pages that answer 404. Observes only; never blocks or changes a request. |
 | `webNavigation` | Tells whether a navigation was started by a meta refresh or a script, so client-side redirects are shown as part of the chain. |
-| `storage` | Keeps the chain of each open tab, the 404s caught per site, the settings and the user's RedirHub API token, in the browser. |
-| Host permissions (`<all_urls>`) | Redirects cross sites (HTTP to HTTPS, one domain to another), so the extension must observe whatever site the user opens. The link check requests the links of the current page, and saving rules calls api.redirhub.com. |
+| `storage` | Keeps the chain of each open tab, the 404s caught per site, the settings and the user's RedirHub sign-in (OAuth tokens), in the browser. |
+| `identity` | Opens RedirHub's sign-in and consent screen (`chrome.identity.launchWebAuthFlow`) and receives the authorization code when the user allows access. |
+| Host permissions (`<all_urls>`) | Redirects cross sites (HTTP to HTTPS, one domain to another), so the extension must observe whatever site the user opens. The link check requests the links of the current page, and saving rules calls RedirHub's MCP server. |
 | Content script on all sites | Detects a meta refresh tag on the page, and lists the page's links when the user asks for a link check. |
 
 **Remote code:** No, I am not using remote code. (All code ships in the package.)
 
 **Data usage, what is collected:**
 
-- [x] Authentication information: the RedirHub API token the dashboard creates when the user connects the extension, kept in the browser and sent only to api.redirhub.com.
+- [x] Authentication information: the OAuth access and refresh tokens RedirHub issues when the user connects the extension, kept in the browser and sent only to RedirHub.
 - [x] Web history: URLs of pages the user visited, sent to RedirHub only when the user saves or exports a redirect rule for them.
 - [x] Personally identifiable information: the name and email of the connected RedirHub account, read from the RedirHub API and shown in the extension.
 - [ ] Everything else (health, financial, communications, location, user activity, website content): not collected.
@@ -96,7 +97,7 @@ The RedirHub Redirect Path & 404 Catcher extension shows the redirects and 404 e
 
 What stays in your browser. To work, the extension reads the addresses, status codes and redirect headers of the pages you open, and the links of a page when you ask it to check them. This information, the 404 errors it catches and your settings are stored in your browser only. Redirect traces are deleted when you close the tab; caught 404 errors stay until you clear them in the extension's settings or remove the extension. We do not receive this information.
 
-What is sent to RedirHub. If you connect your RedirHub account, the extension stores the API token the dashboard creates for it in your browser and sends it to the RedirHub API to identify you. When you choose to save or export redirect rules, the addresses in those rules are sent to your RedirHub account and handled under this policy like any other redirect you create.
+What is sent to RedirHub. If you connect your RedirHub account, you sign in on RedirHub and choose the workspace and what the extension may do; the extension keeps the sign-in tokens RedirHub gives it in your browser and sends them only to RedirHub to identify you. When you choose to save or export redirect rules, the addresses in those rules are sent to your RedirHub account and handled under this policy like any other redirect you create.
 
 The extension does not sell your data, does not use it for advertising, and does not send it to anyone other than RedirHub.
 ```

@@ -1,5 +1,5 @@
 // Turns redirect rules into what RedirHub imports: a CSV for the dashboard's
-// bulk import, or the body of POST /v1/links for one rule.
+// bulk import, or the arguments of the MCP create-redirect tool for one rule.
 
 /** "https://www.example.com/old?x=1" -> "www.example.com/old?x=1", the source format RedirHub takes. */
 export function sourceOf(url) {
@@ -22,10 +22,9 @@ export function rulesToCsv(rules) {
   return lines.join("\n") + "\n";
 }
 
-/** The body of POST /v1/links for a redirect: the source URL carries its host (a `host` field is refused). */
-export function linkBody(rule, note) {
+/** The arguments of the MCP `create-redirect` tool for a rule: the source URL carries its host. */
+export function redirectArgs(rule, note) {
   return {
-    handler: "redirect",
     url: sourceOf(rule.source),
     destination: rule.destination,
     type: rule.type || "301",

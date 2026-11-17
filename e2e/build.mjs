@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 
-/** @param {{ API_BASE: string, DASHBOARD_URL: string, URL_API_TOKENS: string }} config */
+/** @param {{ MCP_URL: string, DASHBOARD_URL: string, URL_CONNECTIONS: string }} config */
 export function buildExtension(config) {
   const dir = mkdtempSync(join(tmpdir(), "rh-ext-"));
   for (const entry of ["manifest.json", "src", "icons"]) cpSync(join(root, entry), join(dir, entry), { recursive: true });

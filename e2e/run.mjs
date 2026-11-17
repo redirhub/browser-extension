@@ -16,9 +16,9 @@ const out = resolve(process.argv[2] || join(root, "e2e", "shots"));
 mkdirSync(out, { recursive: true });
 const PORT = Number(process.env.E2E_PORT || 8443);
 const extension = buildExtension({
-  API_BASE: "https://api.test/v1",
+  MCP_URL: "https://api.test/",
   DASHBOARD_URL: "https://dashboard.test",
-  URL_API_TOKENS: "https://account.test/user/api-tokens",
+  URL_CONNECTIONS: "https://account.test/mcp",
 });
 
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "rh-ext-")), {
@@ -83,18 +83,16 @@ report.scan = await popup("5-404-list", {
 // 6. The sign-in gate on "Create redirects".
 report.gate = await popup("6-gate", { view: "404", before: (page) => page.click(".footer .btn.primary") });
 
-// 7. Connect an account: the options page opens the dashboard's connect page, which hands over a token.
+// 7. Connect an account: Chrome's sign-in window shows the consent screen; Allow hands back a code.
 const options = await context.newPage();
 await options.setViewportSize({ width: 900, height: 760 });
 await options.goto(`${base}/options.html`);
-const connectPage = context.waitForEvent("page");
+const signIn = context.waitForEvent("page");
 await options.click("#connect-button");
-const dashboard = await connectPage;
-await dashboard.waitForSelector("#allow:not([disabled])");
-await dashboard.click("#allow");
-await dashboard.waitForFunction(() => /^(Connected|Failed)/.test(document.getElementById("state-line").textContent));
-report.connectPage = await dashboard.locator("#state-line").innerText();
-await dashboard.close();
+const consent = await signIn;
+await consent.waitForSelector("#allow");
+report.consent = await consent.locator("h1").innerText();
+await consent.click("#allow");
 await options.waitForSelector("#connected:not([hidden])");
 report.connected = await options.locator("#connected").innerText();
 await options.screenshot({ path: join(out, "7-options.png") });
@@ -110,6 +108,14 @@ report.fix = await popup("8-fixed-chain", {
     await page.waitForSelector(".toast:not([hidden])");
   },
 });
+// The access token expires: saving refreshes it first (the stand-in retires the old one).
+const page = await context.newPage();
+await page.goto(`${base}/options.html`);
+await page.evaluate(async () => {
+  const { auth } = await chrome.storage.local.get("auth");
+  await chrome.storage.local.set({ auth: { ...auth, tokens: { ...auth.tokens, expiresAt: 0 } } });
+});
+await page.close();
 await site.goto("https://www.acme-shop.test/blog/");
 await pause(300);
 report.imported = await popup("9-imported", {

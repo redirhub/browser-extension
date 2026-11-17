@@ -1,17 +1,16 @@
 // A test site for the extension, on one port that speaks HTTP and HTTPS: acme-shop.test with a
-// redirect chain, client redirects and 404s; api.test, a stand-in for the RedirHub API that keeps
-// the real API's rules; dashboard.test, a stand-in for the dashboard's connect page. Chromium maps
-// *.test to this port (see run.mjs).
+// redirect chain, client redirects and 404s, and stand-ins for RedirHub's sign-in (account.test)
+// and MCP server (api.test). Chromium maps *.test to this port (see run.mjs).
 //   E2E_PORT=8443 node e2e/server.mjs
 import http from "node:http";
 import https from "node:https";
 import net from "node:net";
 import { execFileSync } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const PORT = Number(process.env.E2E_PORT || 8443);
-export const TOKEN = "test-token";
 
 const dir = join(import.meta.dirname, ".cert");
 if (!existsSync(join(dir, "key.pem"))) {
@@ -79,73 +78,132 @@ function site(req, res) {
   return html(404, page("Page not found", "<p>Sorry, we could not find that page.</p>"));
 }
 
-/** The stand-in API's links, by id. */
+// ---------- stand-ins for RedirHub: an OAuth authorization server and the MCP server ----------
+//
+// account.test signs in as RedirHub's does (redirhub/backend, app/Mcp): discovery, dynamic
+// registration, a consent screen, authorization code with PKCE (S256 checked), refresh tokens.
+// api.test answers MCP tools/call with the tools the extension uses, keeping the real server's
+// rules: one link per source ("Record already exists"), errors as isError results.
+
+const clients = new Map();
+const codes = new Map();
+const tokens = new Map();
+/** The stand-in workspace's links, by id. */
 const links = new Map();
 
-function api(req, res) {
-  let body = "";
-  req.on("data", (chunk) => (body += chunk));
-  req.on("end", () => {
-    const json = (status, data) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(data)); };
-    if (req.headers.authorization !== `Bearer ${TOKEN}`) return json(401, { message: "Unauthenticated." });
-    if (req.method === "GET" && req.url === "/v1/account") {
-      return json(200, { id: "user_test", name: "Kris Brown", email: "kris@acme-shop.test", current_workspace: "a33fd9f1-546b-478b-addb-daa9b81d678d" });
-    }
-    if (req.method === "GET" && req.url === "/v1/workspace/current") {
-      return json(200, { data: { id: "a33fd9f1-546b-478b-addb-daa9b81d678d", name: "Acme Shop" } });
-    }
-    const url = new URL(req.url, "https://api.test");
-    if (req.method === "GET" && url.pathname === "/v1/links") {
-      const search = url.searchParams.get("filter[search]") || "";
-      return json(200, { data: [...links.values()].filter((link) => link.url.includes(search)) });
-    }
-    if (req.method === "POST" && url.pathname === "/v1/links") {
-      const link = JSON.parse(body);
-      // As the real API: a redirect's source URL carries its host, and a source has one link.
-      if ("host" in link) return json(422, { message: "The host field is prohibited.", errors: { host: ["The host field is prohibited."] } });
-      if ([...links.values()].some((other) => other.url === link.url)) return json(400, { message: `Record already exists ${link.url}` });
-      const saved = { id: `link_${Math.random().toString(36).slice(2, 8)}`, ...link };
-      links.set(saved.id, saved);
-      console.log("API POST /v1/links", JSON.stringify(link));
-      return json(200, { data: [saved] });
-    }
-    const id = url.pathname.match(/^\/v1\/links\/(link_\w+)$/)?.[1];
-    if (req.method === "PUT" && links.has(id)) {
-      const saved = { ...links.get(id), ...JSON.parse(body) };
-      links.set(id, saved);
-      console.log(`API PUT /v1/links/${id}`, body);
-      return json(200, saved);
-    }
-    json(404, { message: "Not found" });
+const s256 = (value) => createHash("sha256").update(value).digest("base64url");
+const issue = () => {
+  const access = `access_${randomBytes(12).toString("hex")}`;
+  const refresh = `refresh_${randomBytes(12).toString("hex")}`;
+  tokens.set(access, refresh);
+  return { token_type: "Bearer", access_token: access, refresh_token: refresh, expires_in: 3600 };
+};
+
+function readBody(req) {
+  return new Promise((done) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => done(body));
   });
 }
 
-/** The dashboard's /connect/extension page, reduced to its handshake (redirhub/lviv, src/lib/extensionConnect.ts). */
-const CONNECT_PAGE = `<!doctype html><meta charset="utf-8"><title>Connect</title>
-<body style="font:16px system-ui;padding:40px"><h1>Connect the browser extension</h1>
-<p id="state-line">Looking for the extension…</p><button id="allow" disabled>Connect</button>
-<script>
-const state = new URLSearchParams(location.search).get("state");
-const line = document.getElementById("state-line");
-addEventListener("message", (e) => {
-  if (e.source !== window || e.data?.source !== "extension") return;
-  if (e.data.type === "hello") { allow.disabled = false; line.textContent = "Ready"; }
-  if (e.data.type === "connected") line.textContent = "Connected as " + e.data.name + " in " + e.data.workspace;
-  if (e.data.type === "failed") line.textContent = "Failed: " + e.data.error;
-});
-postMessage({ source: "dashboard", type: "ping" }, location.origin);
-allow.onclick = () => postMessage({ source: "dashboard", type: "token", state, token: "${TOKEN}" }, location.origin);
-</script>`;
+const json = (res, status, data) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(data)); };
 
-function dashboard(req, res) {
-  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(CONNECT_PAGE);
+async function account(req, res) {
+  const url = new URL(req.url, "https://account.test");
+  if (url.pathname === "/.well-known/oauth-authorization-server") {
+    return json(res, 200, {
+      issuer: "https://account.test",
+      authorization_endpoint: "https://account.test/oauth/authorize",
+      token_endpoint: "https://account.test/oauth/token",
+      registration_endpoint: "https://account.test/oauth/register",
+      code_challenge_methods_supported: ["S256"],
+    });
+  }
+  if (url.pathname === "/oauth/register" && req.method === "POST") {
+    const client = JSON.parse(await readBody(req));
+    const id = `client_${randomBytes(6).toString("hex")}`;
+    clients.set(id, client);
+    return json(res, 201, { client_id: id, ...client });
+  }
+  if (url.pathname === "/oauth/authorize") {
+    const q = Object.fromEntries(url.searchParams);
+    const client = clients.get(q.client_id);
+    if (!client?.redirect_uris.includes(q.redirect_uri) || q.code_challenge_method !== "S256") return json(res, 400, { error: "invalid_request" });
+    const code = `code_${randomBytes(8).toString("hex")}`;
+    codes.set(code, { challenge: q.code_challenge, clientId: q.client_id, redirectUri: q.redirect_uri });
+    const back = (params) => `${q.redirect_uri}?${new URLSearchParams({ ...params, state: q.state })}`;
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end(`<!doctype html><meta charset="utf-8"><title>Connect</title><body style="font:16px system-ui;padding:40px">
+      <h1>${client.client_name} wants to connect</h1><p>Scopes: ${q.scope}</p>
+      <a id="deny" href="${back({ error: "access_denied" })}">Cancel</a> <a id="allow" href="${back({ code })}">Allow access</a>`);
+  }
+  if (url.pathname === "/oauth/token" && req.method === "POST") {
+    const form = Object.fromEntries(new URLSearchParams(await readBody(req)));
+    if (form.grant_type === "authorization_code") {
+      const grant = codes.get(form.code);
+      codes.delete(form.code);
+      if (!grant || grant.clientId !== form.client_id || grant.redirectUri !== form.redirect_uri || s256(form.code_verifier || "") !== grant.challenge) {
+        return json(res, 400, { error: "invalid_grant" });
+      }
+      return json(res, 200, issue());
+    }
+    if (form.grant_type === "refresh_token") {
+      const access = [...tokens].find(([, refresh]) => refresh === form.refresh_token)?.[0];
+      if (!access) return json(res, 400, { error: "invalid_grant" });
+      tokens.delete(access);
+      console.log("OAuth refresh: the old access token stops working");
+      return json(res, 200, issue());
+    }
+    return json(res, 400, { error: "unsupported_grant_type" });
+  }
+  json(res, 404, { message: "Not found" });
+}
+
+const TOOLS = {
+  "get-account": () => ({ id: "user_test", name: "Kris Brown", email: "kris@acme-shop.test" }),
+  "get-workspace": () => ({ uuid: "a33fd9f1-546b-478b-addb-daa9b81d678d", name: "Acme Shop" }),
+  "list-links": ({ search = "" }) => ({ data: [...links.values()].filter((link) => link.url.includes(search)), has_more: false }),
+  "create-redirect": (args) => {
+    if ([...links.values()].some((link) => link.url === args.url)) throw new Error(`Record already exists ${args.url}`);
+    const link = { id: `link_${randomBytes(4).toString("hex")}`, handler: "redirect", ...args };
+    links.set(link.id, link);
+    console.log("MCP create-redirect", JSON.stringify(args));
+    return link;
+  },
+  "update-link": ({ id, ...change }) => {
+    if (!links.has(id)) throw new Error(`No link ${id}`);
+    links.set(id, { ...links.get(id), ...change });
+    console.log("MCP update-link", id, JSON.stringify(change));
+    return links.get(id);
+  },
+};
+
+async function api(req, res) {
+  const url = new URL(req.url, "https://api.test");
+  if (url.pathname === "/.well-known/oauth-protected-resource") {
+    return json(res, 200, { resource: "https://api.test", authorization_servers: ["https://account.test"], scopes_supported: ["links:read", "links:write"] });
+  }
+  const bearer = (req.headers.authorization || "").replace(/^Bearer /, "");
+  if (!tokens.has(bearer)) {
+    res.writeHead(401, { "WWW-Authenticate": 'Bearer resource_metadata="https://api.test/.well-known/oauth-protected-resource"' });
+    return res.end();
+  }
+  const rpc = JSON.parse(await readBody(req));
+  const tool = TOOLS[rpc.params?.name];
+  if (rpc.method !== "tools/call" || !tool) return json(res, 200, { jsonrpc: "2.0", id: rpc.id, error: { code: -32602, message: "Unknown tool" } });
+  try {
+    const value = tool(rpc.params.arguments || {});
+    return json(res, 200, { jsonrpc: "2.0", id: rpc.id, result: { content: [{ type: "text", text: JSON.stringify(value) }], isError: false, structuredContent: value } });
+  } catch (error) {
+    return json(res, 200, { jsonrpc: "2.0", id: rpc.id, result: { content: [{ type: "text", text: error.message }], isError: true } });
+  }
 }
 
 function route(req, res) {
   const host = req.headers.host || "";
   if (host.startsWith("api.test")) return api(req, res);
-  if (host.startsWith("dashboard.test")) return dashboard(req, res);
+  if (host.startsWith("account.test")) return account(req, res);
   return site(req, res);
 }
 

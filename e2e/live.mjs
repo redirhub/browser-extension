@@ -1,14 +1,16 @@
-// The extension against a real RedirHub: the backend and the dashboard served locally by
-// redirhub/backend's `.claude/dev-serve.sh --dashboard` (https://api.redirhub.test,
-// https://app.redirhub.test, demo data), and the test site of server.mjs for pages to browse.
+// The extension against a real RedirHub: the backend (its OAuth sign-in and MCP server) and the
+// dashboard served locally by redirhub/backend's `.claude/dev-serve.sh --dashboard`
+// (https://service.redirhub.test, https://api.redirhub.test, https://app.redirhub.test, demo
+// data), and the test site of server.mjs for pages to browse.
 //
 //   (cd ../backend && .claude/dev-serve.sh --dashboard)
 //   node e2e/server.mjs &
 //   node e2e/live.mjs [outDir]
 //
-// It connects the extension through the dashboard (signing in there first), fixes a redirect
-// chain, creates redirects for caught 404s, exports others as a CSV and imports that CSV in the
-// dashboard, then checks every link through the API. Prints a JSON report; exits 1 on a failure.
+// It connects the extension with OAuth (signing in and allowing access on RedirHub's consent
+// screen), fixes a redirect chain twice (create, then update), saves redirects for caught 404s,
+// exports others as a CSV and imports that CSV in the dashboard, then checks every link through
+// the MCP server with the extension's own token. Prints a JSON report; exits 1 on a failure.
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,15 +24,15 @@ const root = resolve(import.meta.dirname, "..");
 const out = resolve(process.argv[2] || join(root, "e2e", "shots-live"));
 mkdirSync(out, { recursive: true });
 const PORT = Number(process.env.E2E_PORT || 8443);
-const API = "https://api.redirhub.test/v1";
+const MCP = "https://api.redirhub.test/";
 const DASHBOARD = "https://app.redirhub.test";
 const LOGIN = { email: process.env.E2E_EMAIL || "demo@redirhub.com", password: process.env.E2E_PASSWORD || "redirhub123" };
 const RUN = Date.now().toString(36);
 
 const extension = buildExtension({
-  API_BASE: API,
+  MCP_URL: MCP,
   DASHBOARD_URL: DASHBOARD,
-  URL_API_TOKENS: "https://service.redirhub.test/user/api-tokens",
+  URL_CONNECTIONS: "https://service.redirhub.test/mcp",
 });
 
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "rh-live-")), {
@@ -58,47 +60,51 @@ const check = (name, ok, detail) => {
   if (!ok) failures.push(name);
 };
 
-// ---------- 1. connect through the dashboard, signing in on the way ----------
+// ---------- 1. connect with OAuth, signing in on the way ----------
 
 const options = await context.newPage();
 await options.setViewportSize({ width: 900, height: 760 });
 await options.goto(`${base}/options.html`);
 const opened = context.waitForEvent("page");
 await options.click("#connect-button");
-const dashboard = await opened;
-await dashboard.setViewportSize({ width: 1280, height: 800 });
-await dashboard.waitForURL("**/login**");
-check("connect page asks to sign in first", dashboard.url().includes("redirect=%2Fconnect%2Fextension"), dashboard.url());
-// The login page signs in with an emailed code by default; `method=password` asks for the password.
-await dashboard.goto(`${dashboard.url()}&method=password`);
-await dashboard.fill("input[name=email]", LOGIN.email);
-await dashboard.fill("input[name=password]", LOGIN.password);
-await dashboard.getByRole("button", { name: "Log in", exact: true }).click();
-await dashboard.waitForURL("**/connect/extension?state=*");
-await dashboard.waitForSelector("[data-testid=connect-allow]:not([disabled])");
-await dashboard.screenshot({ path: join(out, "1-dashboard-consent.png") });
-await dashboard.click("[data-testid=connect-allow]");
-await dashboard.waitForSelector("[data-testid=connect-done]");
-check("dashboard says connected", true, await dashboard.locator("[data-testid=connect-done]").innerText());
-await dashboard.screenshot({ path: join(out, "2-dashboard-connected.png") });
-await dashboard.close();
+const signIn = await opened;
+await signIn.setViewportSize({ width: 900, height: 900 });
+await signIn.waitForSelector("input[name=email]");
+check("sign-in opens RedirHub's login", new URL(signIn.url()).host === "service.redirhub.test", signIn.url());
+await signIn.fill("input[name=email]", LOGIN.email);
+await signIn.getByRole("button", { name: "Use password instead" }).click();
+await signIn.fill("input[name=password]", LOGIN.password);
+await signIn.press("input[name=password]", "Enter");
+const allow = signIn.getByRole("button", { name: "Allow access" });
+await allow.waitFor();
+check("consent screen names the extension", /RedirHub browser extension wants to connect/.test(await signIn.locator("h1").innerText()));
+await signIn.screenshot({ path: join(out, "1-consent.png"), fullPage: true });
+await allow.click();
 
 await options.waitForSelector("#connected:not([hidden])");
 check("extension shows the account", true, (await options.locator("#email").innerText()).trim());
-await options.screenshot({ path: join(out, "3-extension-connected.png") });
-const token = await options.evaluate(async () => (await chrome.storage.local.get("auth")).auth.token);
+await options.screenshot({ path: join(out, "2-extension-connected.png") });
+const auth = await options.evaluate(async () => (await chrome.storage.local.get("auth")).auth);
 await options.close();
+check("access token from OAuth, with a refresh token", auth.tokens.access && auth.tokens.refresh && auth.tokens.expiresAt > Date.now());
 
-/** GET from the API with the token the dashboard gave the extension. */
-const api = async (path) => {
-  const response = await fetch(API + path, { headers: { Accept: "application/json", Authorization: `Bearer ${token}` } });
-  return { status: response.status, body: await response.json().catch(() => null) };
+/** Calls an MCP tool with the extension's own access token. */
+const tool = async (name, args = {}) => {
+  const response = await fetch(MCP, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${auth.tokens.access}` },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
+  });
+  return { status: response.status, result: (await response.json().catch(() => ({}))).result };
 };
 const findLink = async (source) => {
-  const { body } = await api(`/links?filter[search]=${encodeURIComponent(source)}&per_page=50`);
-  return (body?.data || []).find((link) => link.url === source) || null;
+  const { result } = await tool("list-links", { search: source, per_page: 50 });
+  return (result?.structuredContent?.data || []).find((link) => link.url === source) || null;
 };
-check("token works on the API", (await api("/account")).status === 200);
+check("token works on the MCP server", (await tool("get-account")).result?.structuredContent?.email === LOGIN.email);
+// The extension asks for links:read and links:write only: deleting is not in its token.
+const deleting = await tool("delete-link", { id: "link_00000000" });
+check("token cannot delete links", !deleting.result || deleting.result.isError === true, deleting.result?.content?.[0]?.text);
 
 // ---------- 2. fix a redirect chain ----------
 

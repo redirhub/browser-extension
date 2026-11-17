@@ -1,6 +1,9 @@
 // Where the extension finds RedirHub. The end-to-end runs copy the extension with this file
-// pointed at a local backend and dashboard (e2e/build.mjs); nothing else reads addresses.
+// pointed at a local backend (e2e/build.mjs); nothing else holds an address.
 
-export const API_BASE = "https://api.redirhub.com/v1";
+/** The MCP server: the API the extension calls, and where it discovers how to sign in (OAuth). */
+export const MCP_URL = "https://mcp.redirhub.com/";
+/** Where a new user creates an account. */
 export const DASHBOARD_URL = "https://dash.redirhub.com";
-export const URL_API_TOKENS = "https://account.redirhub.com/user/api-tokens";
+/** The account page listing connected apps, where the extension's access is revoked. */
+export const URL_CONNECTIONS = "https://account.redirhub.com/mcp";

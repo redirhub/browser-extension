@@ -18,18 +18,22 @@ similar live page seen on the site, else its parent, else the home page).
 **Create redirects** saves the selected rows as 301s in RedirHub;
 **Export CSV** downloads them for the dashboard's bulk import.
 
-**Connecting.** Connect RedirHub opens the dashboard's `/connect/extension` page
-(redirhub/lviv) with a one-time state. The user signs in there if needed, checks the
-workspace and clicks Connect; the dashboard creates an API token for the extension
-(`POST v0.1.3/account/tokens`, redirhub/backend) and posts it to the extension's
-content script with the state. The token never goes in a URL, and is revoked under
-API tokens like any other. Traces and 404s stay in the browser (`chrome.storage`);
-only the rules the user saves or exports leave it, to the RedirHub API.
+**Connecting.** The extension signs in the way MCP clients such as Claude do, with
+RedirHub's existing OAuth 2.1 server (redirhub/backend, `app/Mcp/OAuth`): it discovers
+the authorization server from the MCP server, registers itself as a public client
+once, and opens the consent screen with `chrome.identity.launchWebAuthFlow`
+(authorization code with PKCE). The user picks the workspace and allows
+`links:read` and `links:write`, nothing more. The access token lasts an hour and is
+refreshed with the refresh token; the connection is revoked under the account's
+connected apps (AI assistants). Sign-in runs on the options page, which stays open
+while the user is on RedirHub.
 
-**Saving.** A rule for a source the workspace already redirects updates that link
-(`PUT /v1/links/{id}`); any other is created (`POST /v1/links`, handler `redirect`,
-the source URL carrying its host). The CSV export has the import template's columns
-(`source URL,destination,type`).
+**Calling RedirHub.** Every call is an MCP tool on the MCP server (`list-links`,
+`create-redirect`, `update-link`, `get-account`, `get-workspace`), one JSON-RPC
+request each. A rule for a source the workspace already redirects updates that link;
+any other is created. The CSV export has the import template's columns
+(`source URL,destination,type`). Traces and 404s stay in the browser
+(`chrome.storage`); only the rules the user saves or exports leave it.
 
 ## Layout
 
@@ -37,8 +41,9 @@ No build step and no dependencies: Chrome loads the folder as it is.
 
 | Path | What it does |
 |---|---|
-| `manifest.json` | Permissions: `webRequest`, `webNavigation`, `storage`, all hosts. |
-| `src/background.js` | Service worker: builds chains from webRequest/webNavigation, catches 404s, checks links, talks to the API. |
+| `manifest.json` | Permissions: `webRequest`, `webNavigation`, `storage`, `identity`, all hosts. |
+| `src/background.js` | Service worker: builds chains from webRequest/webNavigation, catches 404s, checks links, calls RedirHub (refreshing the token). |
+| `src/connect.js` | The OAuth sign-in, run from the options page. |
 | `src/content.js` | Reports meta refresh tags; collects a page's links for the link check. |
 | `src/popup.*`, `src/options.*`, `src/ui.css` | The popup and the settings page. |
 | `src/lib/` | Pure logic, unit-tested in `test/` (`npm test`). |
@@ -61,11 +66,13 @@ node e2e/live.mjs /tmp/live    # against a real backend and dashboard (below)
 
 `live.mjs` needs redirhub/backend's local copy with the dashboard,
 `.claude/dev-serve.sh --dashboard` (with redirhub/lviv next to it), and
-`source ../backend/storage/dev-env/env.sh` in the shell. It signs in to the
-dashboard, connects the extension, fixes a chain twice (create, then update), saves
-redirects for caught 404s, exports others as a CSV and imports that CSV in the
-dashboard, then checks every link through the API. It prints a JSON report and
-exits 1 when a check fails.
+`source ../backend/storage/dev-env/env.sh` in the shell. It signs in on RedirHub's
+login and consent screen, connects the extension, fixes a chain twice (create, then
+update), saves redirects for caught 404s, exports others as a CSV and imports that
+CSV in the dashboard, then checks every link, and that the token cannot delete,
+through the MCP server. It prints a JSON report and exits 1 when a check fails.
+The stand-ins of `run.mjs` (`server.mjs`) do the same OAuth and MCP steps, PKCE and
+token refresh included.
 
 ## Publishing
 
@@ -78,8 +85,6 @@ the privacy policy section are in `store/LISTING.md`. Raise `version` in
 
 ## Before publishing
 
-- The `POST /v1/links` body for a redirect (`url` as `host/path`, `host`) follows
-  the OpenAPI document and the MCP `create-redirect` tool; confirm it with the
-  API owner against a real workspace.
-- A redirect saved for a domain only takes effect once that domain is connected
-  to RedirHub; the API error is shown as it comes.
+- Once the store gives the extension its id, add `<id>.chromiumapp.org` to the backend's
+  `MCP_OAUTH_VERIFIED_HOSTS`, so the consent screen shows it as a verified app instead
+  of warning about it.

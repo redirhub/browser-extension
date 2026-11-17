@@ -1,25 +1,6 @@
 // Tells the extension when a page has a meta refresh, so a client redirect can
-// be named, hands the popup this page's links for the broken-link check, and on
-// the dashboard's connect page relays the API token the dashboard creates.
+// be named, and hands the popup this page's links for the broken-link check.
 (() => {
-  // The dashboard's /connect/extension page (redirhub/lviv, src/lib/extensionConnect.ts). The
-  // background checks the page's origin and the one-time state; this only relays.
-  if (location.pathname === "/connect/extension") {
-    const post = (data) => window.postMessage({ source: "extension", ...data }, location.origin);
-    window.addEventListener("message", async (event) => {
-      if (event.source !== window || event.origin !== location.origin || event.data?.source !== "dashboard") return;
-      if (event.data.type === "ping") {
-        const { waiting } = await chrome.runtime.sendMessage({ type: "connect-hello" });
-        if (waiting) post({ type: "hello" });
-      }
-      if (event.data.type === "token") {
-        const answer = await chrome.runtime.sendMessage({ type: "connect-token", state: event.data.state, token: event.data.token });
-        if (answer?.ok) post({ type: "connected", name: answer.account.name || answer.account.email, workspace: answer.account.workspace || "" });
-        else post({ type: "failed", error: answer?.error || "The extension did not answer." });
-      }
-    });
-  }
-
   function reportMetaRefresh() {
     const tag = document.querySelector('meta[http-equiv="refresh" i]');
     if (!tag) return;

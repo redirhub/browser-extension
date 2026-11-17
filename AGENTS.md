@@ -25,12 +25,13 @@ Every behaviour change comes with a unit test (pure logic in `src/lib/`) or an e
 ## Layout
 
 - `src/background.js`: the service worker. Builds redirect chains from `webRequest` and
-  `webNavigation`, catches 404s, runs the link check, talks to the API. Keep listeners at top
+  `webNavigation`, catches 404s, runs the link check, calls RedirHub's MCP tools. Keep listeners at top
   level (MV3 wakes the worker for them).
 - `src/content.js`: classic script on every page; reports meta refresh tags and collects links.
 - `src/popup.*`, `src/options.*`, `src/ui.css`: the UI. Icons are line SVGs from
   `src/lib/icons.js`; no emoji in the UI.
-- `src/lib/`: pure logic (chain analysis, 404 suggestions, rules, API client).
+- `src/connect.js`: the OAuth sign-in, run from the options page (it stays open meanwhile).
+- `src/lib/`: chain analysis, 404 suggestions, rules, OAuth and MCP helpers.
 - `e2e/`: a local test site with a stand-in API, and a run that screenshots every state.
 - `scripts/`: the store ZIP (`npm run pack`) and the store images (`store-assets.mjs`, a real
   Chrome window on live sites).
@@ -45,13 +46,13 @@ Every behaviour change comes with a unit test (pure logic in `src/lib/`) or an e
   links; anything new that fetches a page must think about side effects the same way.
 - **Only 404 and 410 are "missing".** Login walls and bot checks (403, 405, …) are reported as
   "could not be checked", never as broken.
-- **API.** The public RedirHub API (`https://api.redirhub.com/v1`, bearer token). Do not
-  invent request or response shapes: check them against a real backend (`e2e/live.mjs`).
-  Where the OpenAPI document and the API disagree (a redirect's `host` is documented as
-  required but refused), the API wins and the stand-in in `e2e/server.mjs` follows it.
-- **Addresses** live in `src/lib/config.js` only; the e2e runs replace that file in a copy.
-- **Connecting** goes through the dashboard's `/connect/extension` page. Accept a token only
-  from that page's origin and only with the pending one-time state; never from a URL.
+- **RedirHub, through MCP and OAuth only.** The extension signs in with RedirHub's OAuth
+  server (PKCE, refresh tokens, scopes `links:read` and `links:write`) and calls MCP tools.
+  No API tokens, no second sign-in path, no extra scopes without a feature that needs them.
+  Do not invent tool arguments or results: check them against a real backend
+  (`e2e/live.mjs`), and keep the stand-ins in `e2e/server.mjs` to what the real server does.
+- **Addresses** live in `src/lib/config.js` only (the MCP server; the sign-in is discovered
+  from it); the e2e runs replace that file in a copy.
 - **Copy** follows RedirHub's product facts: plans are Core, Pro and Enterprise (no free plan),
   "130 Global PoPs", "99.99% platform uptime" (never an SLA).
 - **Version.** Raise `version` in `manifest.json` for every store upload.

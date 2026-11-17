@@ -9,7 +9,8 @@
   "permissions": [
     "webRequest",
     "webNavigation",
-    "storage"
+    "storage",
+    "identity"
   ],
   "host_permissions": [
     "<all_urls>"
