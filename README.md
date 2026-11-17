@@ -35,6 +35,7 @@ No build step and no dependencies: Chrome loads the folder as it is.
 | `src/popup.*`, `src/options.*`, `src/ui.css` | The popup and the settings page. |
 | `src/lib/` | Pure logic, unit-tested in `tests/extension.test.mts` (`npm test` at the root). |
 | `e2e/` | A test site and a run that loads the extension in Chromium and screenshots every state. |
+| `scripts/`, `store/` | The store ZIP, the store images and the listing text. |
 
 ## Try it
 
@@ -50,6 +51,14 @@ node extension/e2e/run.mjs /tmp/shots  # Chromium with the extension; prints wha
 
 The run resolves `*.test` and `api.redirhub.com` to the local server, so it
 never touches the real API. Signing in uses the token `test-token`.
+
+## Publishing
+
+`npm --prefix extension run pack` builds the store ZIP in `dist/`;
+`node extension/scripts/store-assets.mjs <shots>` makes the store images from an
+end-to-end run. Listing text, permission justifications, data disclosures and
+the privacy policy section are in `store/LISTING.md`. Raise `version` in
+`manifest.json` for every upload.
 
 ## Before publishing
 

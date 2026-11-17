@@ -54,7 +54,7 @@ async function frame(name, popupShot, badge) {
   const url = site.url();
   const pageShot = await site.screenshot({ type: "png" });
   const page = await context.newPage();
-  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.setViewportSize({ width: 1280, height: 800 });
   const img = (buffer) => `data:image/png;base64,${buffer.toString("base64")}`;
   await page.setContent(`<!doctype html><style>
     body{margin:0;font:13px system-ui;background:#dfe3ea}
@@ -64,7 +64,7 @@ async function frame(name, popupShot, badge) {
     .ext{position:relative;width:32px;height:32px;display:grid;place-items:center;border-radius:8px;background:#e4e7ec}
     .ext img{width:18px;height:18px}
     .badge{position:absolute;right:-6px;bottom:-4px;min-width:16px;padding:0 4px;height:16px;border-radius:4px;color:#fff;font:700 10px/16px system-ui;text-align:center}
-    .page{display:block;width:1280px;height:800px}
+    .page{display:block;width:1280px;height:740px;object-fit:cover;object-position:top}
     .popup{position:absolute;top:58px;right:14px;width:440px;height:600px;border-radius:10px;box-shadow:0 18px 50px rgba(16,24,40,.35),0 0 0 1px rgba(16,24,40,.12);overflow:hidden}
   </style><div class="bar"><span class="dots"><i></i><i></i><i></i></span><div class="url">${url}</div>
   <div class="ext"><img src="${img(readFileSync(join(extension, "icons/icon-32.png")))}">${badge.text ? `<span class="badge" style="background:${badge.color}">${badge.text}</span>` : ""}</div></div>

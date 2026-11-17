@@ -4,18 +4,45 @@
   "short_name": "RedirHub",
   "version": "0.1.0",
   "description": "See every redirect a page goes through (301, 302, HSTS, meta refresh, JavaScript), catch the 404s you hit, and fix them in RedirHub.",
+  "homepage_url": "https://www.redirhub.com",
   "minimum_chrome_version": "116",
-  "permissions": ["webRequest", "webNavigation", "storage"],
-  "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "src/background.js", "type": "module" },
+  "permissions": [
+    "webRequest",
+    "webNavigation",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
   "content_scripts": [
-    { "matches": ["http://*/*", "https://*/*"], "js": ["src/content.js"], "run_at": "document_start" }
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_start"
+    }
   ],
   "action": {
     "default_popup": "src/popup.html",
     "default_title": "Redirects and 404s on this page",
-    "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" }
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
   },
   "options_page": "src/options.html",
-  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
 }
