@@ -33,7 +33,7 @@ WHAT IT FLAGS
 
 404 CATCHER
 • Every page that answers 404 or 410 while you browse is listed per site, with the page that linked to it
-• "Check the links on this page" tests every link of the page you are on, and lists broken links and links that go through a redirect
+• "Check the links on this page" tests every link of the page you are on to the same site: broken links, and links that go through a redirect with where they end up
 • Each 404 comes with a suggested destination: the most similar live page of the site, its parent, or the home page
 
 FIX IT IN REDIRHUB

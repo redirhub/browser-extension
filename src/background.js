@@ -241,11 +241,14 @@ async function notFoundFor(host) {
     .map((entry) => ({ ...entry, suggestion: suggestDestination(entry.url, live) }));
 }
 
+const isMissing = (status) => status === 404 || status === 410;
+
 async function checkUrl(url) {
   const attempt = (method) => fetch(url, { method, redirect: "follow", credentials: "include", cache: "no-store" });
   try {
     let response = await attempt("HEAD");
-    if (response.status === 405 || response.status === 501) response = await attempt("GET");
+    // Plenty of servers refuse HEAD (403, 405, 501): ask again the way a browser would.
+    if (response.status >= 400 && !isMissing(response.status)) response = await attempt("GET");
     return { url, status: response.status, redirected: response.redirected, finalUrl: response.url };
   } catch (error) {
     return { url, status: 0, error: String(error.message || error) };
@@ -265,15 +268,17 @@ async function scanLinks(tabId) {
   }
   await Promise.all(Array.from({ length: SCAN_CONCURRENCY }, worker));
   for (const result of results) {
-    if (result.status === 404 || result.status === 410) await recordNotFound(result.url, result.status, tab.url, "scan");
+    if (isMissing(result.status)) await recordNotFound(result.url, result.status, tab.url, "scan");
     else if (result.status >= 200 && result.status < 300 && !result.redirected) await recordLive(result.url);
     else if (result.redirected && result.status < 300) await recordLive(result.finalUrl);
   }
   return {
     checked: results.length,
     total: links.length,
-    broken: results.filter((r) => r.status >= 400 || r.status === 0),
+    broken: results.filter((r) => isMissing(r.status)),
     redirected: results.filter((r) => r.redirected && r.status < 400),
+    // Answered something else than a page or a 404: a login wall, a bot check, a server error.
+    unchecked: results.filter((r) => !isMissing(r.status) && (r.status >= 400 || r.status === 0)),
   };
 }
 

@@ -54,7 +54,7 @@ section { padding: 14px; }
 .actions .btn.primary { flex: 1; justify-content: center; }
 
 .empty { text-align: center; color: var(--muted); padding: 40px 10px; }
-.empty .icon { font-size: 30px; }
+.empty .icon { color: #98A2B3; display: flex; justify-content: center; }
 .empty strong { display: block; color: var(--ink); margin: 6px 0 2px; font-size: 14px; }
 .note { font-size: 12px; color: var(--muted); background: var(--wash); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 
@@ -64,6 +64,14 @@ section { padding: 14px; }
 .site label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
 .scan { width: 100%; justify-content: center; margin-bottom: 10px; }
 .scan-result { font-size: 12px; background: var(--primary-bg); color: #1A4F82; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+.redirected { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; margin-bottom: 12px; }
+.redirected .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.redirected ul { list-style: none; margin: 0 0 4px; padding: 0; }
+.redirected li { display: flex; gap: 6px; font-size: 12px; padding: 3px 0; border-top: 1px solid #F2F4F7; min-width: 0; }
+.redirected li:first-child { border-top: 0; }
+.redirected .from { color: #344054; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46%; }
+.redirected .arrow { color: var(--teal); font-weight: 700; flex: none; }
+.redirected .to { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nf-head { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11.5px; font-weight: 600; margin-bottom: 6px; }
 .nf-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .nf { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; display: grid; grid-template-columns: 18px 1fr; gap: 8px; }
@@ -83,7 +91,7 @@ section { padding: 14px; }
 /* Gate */
 .gate { position: fixed; inset: 0; background: rgba(16, 24, 40, .45); display: grid; place-items: center; padding: 18px; }
 .gate-card { background: #fff; border-radius: 14px; padding: 18px; text-align: center; box-shadow: 0 20px 40px rgba(16,24,40,.2); }
-.gate-icon { font-size: 26px; }
+.gate-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--primary-bg); color: var(--primary); display: grid; place-items: center; margin: 0 auto 4px; }
 .gate h2 { font-size: 16px; margin: 6px 0; }
 .gate p { color: #475467; margin: 0 0 10px; font-size: 12.5px; }
 .gate ul { text-align: left; margin: 0 0 14px; padding-left: 18px; font-size: 12.5px; }

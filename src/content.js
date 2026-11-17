@@ -28,6 +28,8 @@
         continue;
       }
       if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) continue;
+      // Requesting these would sign the user out or start a download.
+      if (anchor.hasAttribute("download") || /log-?out|sign-?out|log-?off/i.test(url.pathname + url.search)) continue;
       url.hash = "";
       if (url.href !== location.href) links.add(url.href);
     }

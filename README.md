@@ -55,8 +55,9 @@ never touches the real API. Signing in uses the token `test-token`.
 ## Publishing
 
 `npm --prefix extension run pack` builds the store ZIP in `dist/`;
-`node extension/scripts/store-assets.mjs <shots>` makes the store images from an
-end-to-end run. Listing text, permission justifications, data disclosures and
+`node extension/scripts/store-assets.mjs` takes the five store screenshots in a
+real Chrome window on live sites (Apple, HP, redirhub.com; needs Xvfb and
+ImageMagick, and `CA_BUNDLE` behind an HTTPS proxy) and draws the promo tile. Listing text, permission justifications, data disclosures and
 the privacy policy section are in `store/LISTING.md`. Raise `version` in
 `manifest.json` for every upload.
 

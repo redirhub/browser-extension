@@ -1,6 +1,7 @@
 import { hopTone, shortUrl, statusLabel, statusText } from "./lib/chain.js";
 import { rulesToCsv } from "./lib/rules.js";
 import { URL_REGISTER } from "./lib/redirhub.js";
+import { icon } from "./lib/icons.js";
 
 const $ = (id) => document.getElementById(id);
 const send = (message) => chrome.runtime.sendMessage(message);
@@ -69,7 +70,7 @@ function requireAccount(title, action) {
 // ---------- redirects ----------
 
 function lockMark() {
-  return state.account ? null : h("span", { class: "lock", "aria-label": "Needs a RedirHub account" }, "🔒");
+  return state.account ? null : h("span", { class: "lock", title: "Needs a RedirHub account" }, icon("lock", 13));
 }
 
 function hopRow(hop, index, hops) {
@@ -113,7 +114,7 @@ async function fixChain(rule, button) {
   const answer = await send({ type: "create-redirects", rules: [rule], note: "Added from the browser extension to replace a redirect chain with one 301." });
   const result = answer.ok ? answer.results[0] : { ok: false, error: answer.error };
   if (result.ok) {
-    button.textContent = "✓ Saved in RedirHub";
+    button.replaceChildren(icon("check"), "Saved in RedirHub");
     toast(`Saved: ${shortUrl(rule.source)} now goes straight to the final page.`, "success");
   } else {
     button.disabled = false;
@@ -128,7 +129,7 @@ function renderChain() {
   const reload = h("button", { class: "btn", type: "button", onclick: () => chrome.tabs.reload(state.tab.id).then(() => window.close()) }, "Reload");
 
   if (!hops.length) {
-    view.append(h("div", { class: "empty" }, h("div", { class: "icon" }, "↪"), h("strong", {}, "No trace for this page yet"), h("p", {}, "Reload it to see every redirect it goes through."), reload));
+    view.append(h("div", { class: "empty" }, h("div", { class: "icon" }, icon("refresh", 26)), h("strong", {}, "No trace for this page yet"), h("p", {}, "Reload it to see every redirect it goes through."), reload));
     return;
   }
   const last = hops[hops.length - 1];
@@ -231,7 +232,7 @@ function exportCsv() {
 async function scan() {
   const button = $("scan");
   button.disabled = true;
-  button.textContent = "Checking links…";
+  button.replaceChildren("Checking links…");
   const answer = await send({ type: "scan-links", tabId: state.tab.id });
   state.scan = answer.ok ? answer : { error: "This page cannot be checked. Reload it and try again." };
   await loadNotFound();
@@ -251,7 +252,7 @@ function renderNotFound() {
     h("span", { class: "host" }, site),
     h("label", {}, "Catch 404s", h("span", { class: "switch" }, toggle, h("span"))),
   ));
-  view.append(h("button", { class: "btn scan", id: "scan", type: "button", onclick: scan }, "🔎 Check the links on this page"));
+  view.append(h("button", { class: "btn scan", id: "scan", type: "button", onclick: scan }, icon("search"), "Check the links on this page"));
 
   if (state.scan) {
     const s = state.scan;
@@ -259,13 +260,15 @@ function renderNotFound() {
       `Checked ${plural(s.checked, "link")}`,
       s.total > s.checked ? ` of ${s.total}` : "",
       `: ${s.broken.length} broken`,
-      s.redirected.length ? `, ${plural(s.redirected.length, "link")} to a redirect (link to the final URL instead)` : "",
+      s.redirected.length ? `, ${s.redirected.length} through a redirect (link to the final URL instead)` : "",
+      s.unchecked.length ? `, ${s.unchecked.length} could not be checked (sign-in or bot protection)` : "",
       ".",
     ].join("")));
+    if (s.redirected?.length) view.append(redirectedLinks(s.redirected));
   }
 
   if (!state.notFound.length) {
-    view.append(h("div", { class: "empty" }, h("div", { class: "icon" }, "✓"), h("strong", {}, `No 404s caught on ${site}`), h("p", {}, "Browse the site or check this page's links. Every page that answers 404 shows up here, ready to redirect.")));
+    view.append(h("div", { class: "empty" }, h("div", { class: "icon" }, icon("circleCheck", 26)), h("strong", {}, `No 404s caught on ${site}`), h("p", {}, "Browse the site or check this page's links. Every page that answers 404 shows up here, ready to redirect.")));
     return;
   }
 
@@ -289,6 +292,23 @@ function renderNotFound() {
   )));
   view.append(h("div", { class: "footer", id: "nf-footer" }));
   renderFooter();
+}
+
+const SHOWN_REDIRECTED = 5;
+
+/** The page's links that answer with a redirect, each with where it ends up. */
+function redirectedLinks(links) {
+  const more = links.length - SHOWN_REDIRECTED;
+  return h("div", { class: "redirected" },
+    h("div", { class: "label" }, "Links that go through a redirect"),
+    h("ul", {}, links.slice(0, SHOWN_REDIRECTED).map((link) =>
+      h("li", {}, h("span", { class: "from" }, shortPath(link.url)), h("span", { class: "arrow" }, "→"), h("span", { class: "to" }, shortPath(link.finalUrl))),
+    )),
+    more > 0 ? h("button", { class: "link", type: "button", onclick: async () => {
+      await navigator.clipboard.writeText(links.map((l) => `${l.url}\t${l.finalUrl}`).join("\n"));
+      toast(`${plural(links.length, "link")} copied with their final URLs.`);
+    } }, `Copy all ${links.length}`) : null,
+  );
 }
 
 function renderFooter() {
@@ -338,6 +358,7 @@ async function main() {
   $("gate-connect").onclick = () => chrome.runtime.openOptionsPage();
   $("gate-register").onclick = () => chrome.tabs.create({ url: URL_REGISTER });
   $("gate-close").onclick = () => ($("gate").hidden = true);
+  $("gate-icon").append(icon("lock", 22));
 }
 
 main();
