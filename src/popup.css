@@ -88,15 +88,13 @@ section { padding: 14px; }
 .footer { position: sticky; bottom: -14px; margin: 12px -14px -14px; background: #fff; border-top: 1px solid var(--line); padding: 10px 14px; display: flex; gap: 8px; align-items: center; }
 .footer .sel { color: var(--muted); font-size: 12px; flex: 1; }
 
-/* Gate */
-.gate { position: fixed; inset: 0; background: rgba(16, 24, 40, .45); display: grid; place-items: center; padding: 18px; }
-.gate-card { background: #fff; border-radius: 14px; padding: 18px; text-align: center; box-shadow: 0 20px 40px rgba(16,24,40,.2); }
-.gate-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--primary-bg); color: var(--primary); display: grid; place-items: center; margin: 0 auto 4px; }
-.gate h2 { font-size: 16px; margin: 6px 0; }
-.gate p { color: #475467; margin: 0 0 10px; font-size: 12.5px; }
-.gate ul { text-align: left; margin: 0 0 14px; padding-left: 18px; font-size: 12.5px; }
-.gate li { margin: 2px 0; }
-.gate .row { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
 
-.toast { position: fixed; left: 14px; right: 14px; bottom: 64px; background: var(--ink); color: #fff; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; box-shadow: 0 8px 20px rgba(16,24,40,.25); }
-.toast.success { background: #0E6B5F; }
+/* Domains */
+.domains-intro h2 { font-size: 15px; margin: 4px 0 4px; }
+.domains-intro p { color: #475467; margin: 0 0 14px; }
+.domains-last { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+.domains-last .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+.domains-counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; }
+.domains-counts b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.domains-counts span { color: var(--muted); font-size: 11px; }
+.btn.wide { width: 100%; justify-content: center; }

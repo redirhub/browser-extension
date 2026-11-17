@@ -16,6 +16,7 @@ import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildExtension } from "./build.mjs";
+import { PORTFOLIO } from "./portfolio.mjs";
 import { extensionSession } from "./session.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -45,7 +46,7 @@ const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir()
     `--disable-extensions-except=${extension}`,
     `--load-extension=${extension}`,
     // The test site; *.redirhub.test resolves to this machine through /etc/hosts.
-    `--host-resolver-rules=MAP *.acme-shop.test 127.0.0.1:${PORT}, MAP acme-shop.test 127.0.0.1:${PORT}`,
+    `--host-resolver-rules=MAP gone-domain.test ~NOTFOUND, MAP *.acme-shop.test 127.0.0.1:${PORT}, MAP acme-shop.test 127.0.0.1:${PORT}, ${PORTFOLIO.map((d) => `MAP ${d} 127.0.0.1:${PORT}`).join(", ")}`,
     // The test site's certificate is self-signed; the extension's own requests check it too.
     "--ignore-certificate-errors",
     "--no-proxy-server",
@@ -203,13 +204,37 @@ for (const path of exported) {
   check(`imported ${source}`, Boolean(link), link && { id: link.id, destination: link.destination, type: link.type });
 }
 
-// ---------- 5. the links in the dashboard ----------
+// ---------- 5. check a portfolio and forward its idle domains ----------
+
+const checker = await context.newPage();
+await checker.setViewportSize({ width: 1280, height: 800 });
+await checker.goto(`${base}/domains.html`);
+await checker.fill("#list", PORTFOLIO.join("\n"));
+await checker.click("#run");
+await checker.waitForSelector("#progress[hidden]", { state: "attached", timeout: 120000 });
+const verdicts = Object.fromEntries(await checker.$$eval("#rows tr", (rows) => rows.map((tr) => [tr.dataset.domain || tr.querySelector(".domain").textContent, tr.querySelector(".pill")?.textContent])));
+check("portfolio verdicts", verdicts["premium-name.test"] === "For sale" && verdicts["ads-parked.test"] === "Parked" && verdicts["gone-domain.test"] === "No DNS" && verdicts["old-brand.test"] === "Forwards", verdicts);
+const idle = ["premium-name.test", "ads-parked.test"];
+for (const domain of idle) await checker.check(`tr[data-domain="${domain}"] input`);
+await checker.click("#forward");
+await checker.fill("#destination", "https://www.acme-shop.test/");
+await checker.click(".dialog-card .btn.primary");
+await checker.waitForFunction(() => /forwarded in RedirHub/.test(document.getElementById("toast")?.textContent || ""));
+check("checker reports the domains forwarded", true, await checker.locator("#toast").innerText());
+await checker.screenshot({ path: join(out, "8-domain-checker.png") });
+await checker.close();
+for (const domain of idle) {
+  const link = await findLink(domain);
+  check(`forwarded ${domain}`, link?.destination === "https://www.acme-shop.test/" && link?.type === "301", link && { id: link.id, url: link.url, destination: link.destination });
+}
+
+// ---------- 6. the links in the dashboard ----------
 
 const links = await context.newPage();
 await links.setViewportSize({ width: 1280, height: 800 });
 await links.goto(`${DASHBOARD}/links?search=acme-shop.test`);
 await links.getByText("acme-shop.test/summer-sale").first().waitFor({ timeout: 30000 }).catch(() => {});
-await links.screenshot({ path: join(out, "8-dashboard-links.png") });
+await links.screenshot({ path: join(out, "9-dashboard-links.png") });
 await links.close();
 
 await context.close();

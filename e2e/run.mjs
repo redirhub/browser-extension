@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildExtension } from "./build.mjs";
+import { PORTFOLIO } from "./portfolio.mjs";
 import { extensionSession } from "./session.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -30,7 +31,7 @@ const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir()
   args: [
     `--disable-extensions-except=${extension}`,
     `--load-extension=${extension}`,
-    `--host-resolver-rules=MAP *.test 127.0.0.1:${PORT}`,
+    `--host-resolver-rules=MAP gone-domain.test ~NOTFOUND, MAP *.test 127.0.0.1:${PORT}`,
     "--ignore-certificate-errors",
     "--no-proxy-server",
   ],
@@ -125,6 +126,35 @@ report.imported = await popup("9-imported", {
     await page.waitForSelector(".toast:not([hidden])");
   },
 });
+
+// 10. The domain checker: a pasted portfolio, one verdict per domain.
+const checker = await context.newPage();
+await checker.setViewportSize({ width: 1280, height: 800 });
+await checker.goto(`${base}/domains.html`);
+await checker.fill("#list", `${PORTFOLIO.join("\n")}\nnot a domain`);
+report.domainCount = await checker.locator("#count").innerText();
+await checker.click("#run");
+await checker.waitForSelector("#progress[hidden]", { state: "attached", timeout: 120000 });
+await checker.waitForSelector("#toast[hidden]", { state: "attached", timeout: 10000 });
+report.domains = Object.fromEntries(await checker.$$eval("#rows tr", (rows) => rows.map((tr) => [
+  tr.querySelector(".domain").textContent,
+  [...tr.querySelectorAll("td")].slice(2).map((td) => td.innerText.replace(/\s+/g, " ").trim()).join(" | "),
+])));
+await checker.screenshot({ path: join(out, "10-domains.png"), fullPage: true });
+
+// 11. Forward the parked and for-sale ones (signed in since step 7).
+for (const domain of ["premium-name.test", "ads-parked.test"]) await checker.check(`tr[data-domain="${domain}"] input`);
+await checker.click("#forward");
+await checker.fill("#destination", "https://www.acme-shop.test/");
+await checker.screenshot({ path: join(out, "11-domains-forward.png") });
+await checker.click(".dialog-card .btn.primary");
+await checker.waitForFunction(() => /forwarded in RedirHub/.test(document.getElementById("toast")?.textContent || ""));
+report.forwarded = await checker.locator(".toast").innerText();
+await checker.screenshot({ path: join(out, "12-domains-forwarded.png"), fullPage: true });
+await checker.close();
+
+// 12. The popup's Domains tab sums up the last check.
+report.domainsTab = await popup("13-popup-domains", { view: "domains" });
 
 console.log(JSON.stringify(report, null, 2));
 await context.close();

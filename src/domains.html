@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Domain checker · RedirHub</title>
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="domains.css">
+</head>
+<body>
+  <header class="top">
+    <img class="logo" src="../icons/icon-32.png" alt="">
+    <div class="brand"><strong>Domain checker</strong><span>RedirHub · for domain portfolios</span></div>
+    <button class="account signed-out" id="account" type="button">Sign in</button>
+  </header>
+
+  <main class="wrap">
+    <section class="card input">
+      <h1>Check a list of domains</h1>
+      <p class="lead">Paste up to 1,000 domains, one per line or separated by commas. Each one is checked
+        from your browser: where it goes, whether HTTPS works, and whether it is parked or for sale.</p>
+      <textarea id="list" rows="7" spellcheck="false" placeholder="example.com&#10;example.net&#10;old-brand.io"></textarea>
+      <div class="input-row">
+        <span id="count" class="muted"></span>
+        <button class="btn primary" id="run" type="button" disabled>Check domains</button>
+      </div>
+      <div class="progress" id="progress" hidden>
+        <div class="bar"><span id="bar"></span></div>
+        <span id="progress-text"></span>
+        <button class="link" id="stop" type="button">Stop</button>
+      </div>
+    </section>
+
+    <section id="results" hidden>
+      <div class="summary" id="summary"></div>
+      <div class="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th class="pick"><input type="checkbox" id="pick-all" aria-label="Select all shown"></th>
+              <th>Domain</th><th>Verdict</th><th>Where it goes</th><th>HTTPS</th><th>Redirects</th><th class="num">Time</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="actions-bar" id="actions" hidden>
+        <span id="selected" class="muted"></span>
+        <button class="btn" id="export" type="button"></button>
+        <button class="btn primary" id="forward" type="button"></button>
+      </div>
+
+      <p class="muted note">Requests go from this browser straight to each domain, without cookies. Nothing is sent to RedirHub until you forward or export.</p>
+    </section>
+  </main>
+
+  <script type="module" src="domains.js"></script>
+</body>
+</html>

@@ -31,7 +31,10 @@ Every behaviour change comes with a unit test (pure logic in `src/lib/`) or an e
 - `src/popup.*`, `src/options.*`, `src/ui.css`: the UI. Icons are line SVGs from
   `src/lib/icons.js`; no emoji in the UI.
 - `src/connect.js`: the OAuth sign-in, run from the options page (it stays open meanwhile).
-- `src/lib/`: chain analysis, 404 suggestions, rules, OAuth and MCP helpers.
+- `src/domains.*`: the domain checker page; `src/lib/domains.js` holds its logic (list parsing,
+  parking and for-sale detection, verdicts) and the background script makes the requests.
+- `src/lib/`: chain analysis, 404 suggestions, domain verdicts, rules, OAuth and MCP helpers,
+  shared DOM helpers (`dom.js`) and the sign-in prompt (`gate.js`).
 - `e2e/`: a local test site with a stand-in API, and a run that screenshots every state.
 - `scripts/`: the store ZIP (`npm run pack`) and the store images (`store-assets.mjs`, a real
   Chrome window on live sites).
@@ -43,7 +46,10 @@ Every behaviour change comes with a unit test (pure logic in `src/lib/`) or an e
   except what the user saves or exports, and only to the RedirHub API. Keep the store
   disclosures in `store/LISTING.md` true when this changes.
 - **Requests carry the user's cookies.** The link check never requests sign-out or download
-  links; anything new that fetches a page must think about side effects the same way.
+  links; anything new that fetches a page must think about side effects the same way. The
+  domain checker sends no cookies at all (`credentials: "omit"`).
+- **Parking and sales services are named only on evidence:** the final address or a script or
+  phrase in the page (`src/lib/domains.js`). A new provider comes with a unit test.
 - **Only 404 and 410 are "missing".** Login walls and bot checks (403, 405, …) are reported as
   "could not be checked", never as broken.
 - **RedirHub, through MCP and OAuth only.** The extension signs in with RedirHub's OAuth

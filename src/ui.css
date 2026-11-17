@@ -52,3 +52,16 @@ input:focus { outline: 2px solid var(--primary-bg); border-color: var(--primary)
 .switch span::before { content: ""; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: .15s; }
 .switch input:checked + span { background: var(--teal); }
 .switch input:checked + span::before { transform: translateX(14px); }
+
+/* Gate */
+.gate { position: fixed; inset: 0; z-index: 30; background: rgba(16, 24, 40, .45); display: grid; place-items: center; padding: 18px; }
+.gate-card { background: #fff; max-width: 420px; border-radius: 14px; padding: 18px; text-align: center; box-shadow: 0 20px 40px rgba(16,24,40,.2); }
+.gate-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--primary-bg); color: var(--primary); display: grid; place-items: center; margin: 0 auto 4px; }
+.gate h2 { font-size: 16px; margin: 6px 0; }
+.gate p { color: #475467; margin: 0 0 10px; font-size: 12.5px; }
+.gate ul { text-align: left; margin: 0 0 14px; padding-left: 18px; font-size: 12.5px; }
+.gate li { margin: 2px 0; }
+.gate .row { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+
+.toast { position: fixed; left: 14px; right: 14px; bottom: 64px; max-width: 520px; margin: 0 auto; z-index: 20; background: var(--ink); color: #fff; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; box-shadow: 0 8px 20px rgba(16,24,40,.25); }
+.toast.success { background: #0E6B5F; }
