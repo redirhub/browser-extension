@@ -79,6 +79,9 @@ function site(req, res) {
   return html(404, page("Page not found", "<p>Sorry, we could not find that page.</p>"));
 }
 
+/** The stand-in API's links, by id. */
+const links = new Map();
+
 function api(req, res) {
   let body = "";
   req.on("data", (chunk) => (body += chunk));
@@ -91,12 +94,27 @@ function api(req, res) {
     if (req.method === "GET" && req.url === "/v1/workspace/current") {
       return json(200, { data: { id: "a33fd9f1-546b-478b-addb-daa9b81d678d", name: "Acme Shop" } });
     }
-    if (req.method === "POST" && req.url === "/v1/links") {
+    const url = new URL(req.url, "https://api.test");
+    if (req.method === "GET" && url.pathname === "/v1/links") {
+      const search = url.searchParams.get("filter[search]") || "";
+      return json(200, { data: [...links.values()].filter((link) => link.url.includes(search)) });
+    }
+    if (req.method === "POST" && url.pathname === "/v1/links") {
       const link = JSON.parse(body);
-      // As the real API: a redirect's source URL carries its host.
+      // As the real API: a redirect's source URL carries its host, and a source has one link.
       if ("host" in link) return json(422, { message: "The host field is prohibited.", errors: { host: ["The host field is prohibited."] } });
+      if ([...links.values()].some((other) => other.url === link.url)) return json(400, { message: `Record already exists ${link.url}` });
+      const saved = { id: `link_${Math.random().toString(36).slice(2, 8)}`, ...link };
+      links.set(saved.id, saved);
       console.log("API POST /v1/links", JSON.stringify(link));
-      return json(200, { data: [{ id: `link_${Math.random().toString(36).slice(2, 8)}`, ...link }] });
+      return json(200, { data: [saved] });
+    }
+    const id = url.pathname.match(/^\/v1\/links\/(link_\w+)$/)?.[1];
+    if (req.method === "PUT" && links.has(id)) {
+      const saved = { ...links.get(id), ...JSON.parse(body) };
+      links.set(id, saved);
+      console.log(`API PUT /v1/links/${id}`, body);
+      return json(200, saved);
     }
     json(404, { message: "Not found" });
   });

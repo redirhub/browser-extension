@@ -74,7 +74,7 @@ Shows the redirects and 404 errors of the pages the user visits, and lets the us
 
 **Data usage, what is collected:**
 
-- [x] Authentication information: the RedirHub API token the user pastes, sent only to api.redirhub.com.
+- [x] Authentication information: the RedirHub API token the dashboard creates when the user connects the extension, kept in the browser and sent only to api.redirhub.com.
 - [x] Web history: URLs of pages the user visited, sent to RedirHub only when the user saves or exports a redirect rule for them.
 - [x] Personally identifiable information: the name and email of the connected RedirHub account, read from the RedirHub API and shown in the extension.
 - [ ] Everything else (health, financial, communications, location, user activity, website content): not collected.
@@ -96,7 +96,7 @@ The RedirHub Redirect Path & 404 Catcher extension shows the redirects and 404 e
 
 What stays in your browser. To work, the extension reads the addresses, status codes and redirect headers of the pages you open, and the links of a page when you ask it to check them. This information, the 404 errors it catches and your settings are stored in your browser only. Redirect traces are deleted when you close the tab; caught 404 errors stay until you clear them in the extension's settings or remove the extension. We do not receive this information.
 
-What is sent to RedirHub. If you connect your RedirHub account, the extension stores your API token in your browser and sends it to the RedirHub API to identify you. When you choose to save or export redirect rules, the addresses in those rules are sent to your RedirHub account and handled under this policy like any other redirect you create.
+What is sent to RedirHub. If you connect your RedirHub account, the extension stores the API token the dashboard creates for it in your browser and sends it to the RedirHub API to identify you. When you choose to save or export redirect rules, the addresses in those rules are sent to your RedirHub account and handled under this policy like any other redirect you create.
 
 The extension does not sell your data, does not use it for advertising, and does not send it to anyone other than RedirHub.
 ```

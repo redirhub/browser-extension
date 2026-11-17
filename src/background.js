@@ -5,7 +5,7 @@
 import { analyzeChain } from "./lib/chain.js";
 import { suggestDestination } from "./lib/suggest.js";
 import { DASHBOARD_URL } from "./lib/config.js";
-import { CONNECT_PATH, createRedirects, getAccount } from "./lib/redirhub.js";
+import { CONNECT_PATH, getAccount, saveRedirects } from "./lib/redirhub.js";
 
 const FILTER = { urls: ["http://*/*", "https://*/*"], types: ["main_frame"] };
 const KEEP_HEADERS = ["server", "location", "x-redirect-by", "x-powered-by", "cache-control", "non-authoritative-reason"];
@@ -378,10 +378,10 @@ const handlers = {
   async "sign-out"() {
     await chrome.storage.local.remove("auth");
   },
-  async "create-redirects"({ rules, note }) {
+  async "save-redirects"({ rules, note }) {
     const { auth } = await chrome.storage.local.get("auth");
     if (!auth?.token) return { needsSignIn: true };
-    return { results: await createRedirects(auth.token, rules, note) };
+    return { results: await saveRedirects(auth.token, rules, note) };
   },
   async "clear-data"() {
     const all = await chrome.storage.local.get(null);

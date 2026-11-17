@@ -13,8 +13,12 @@ old path. No compatibility shims, fallbacks or "just in case" code paths.
 
 ```bash
 npm test          # unit tests of src/lib (node:test, no dependencies)
-npm run e2e       # needs `node e2e/server.mjs` running (ports 80/443): Chromium with the extension
+npm run e2e       # needs `node e2e/server.mjs` running: every popup state, against stand-ins
+node e2e/live.mjs # against a real local backend and dashboard (README, End-to-end runs)
 ```
+
+A change to how the extension talks to RedirHub (connecting, saving, exporting) runs
+`e2e/live.mjs` too: the stand-ins only know what the real API was seen to do.
 
 Every behaviour change comes with a unit test (pure logic in `src/lib/`) or an e2e step.
 
@@ -41,8 +45,13 @@ Every behaviour change comes with a unit test (pure logic in `src/lib/`) or an e
   links; anything new that fetches a page must think about side effects the same way.
 - **Only 404 and 410 are "missing".** Login walls and bot checks (403, 405, …) are reported as
   "could not be checked", never as broken.
-- **API.** The public RedirHub API (`https://api.redirhub.com/v1`, bearer token), as its
-  OpenAPI document describes it. Do not invent request or response shapes.
+- **API.** The public RedirHub API (`https://api.redirhub.com/v1`, bearer token). Do not
+  invent request or response shapes: check them against a real backend (`e2e/live.mjs`).
+  Where the OpenAPI document and the API disagree (a redirect's `host` is documented as
+  required but refused), the API wins and the stand-in in `e2e/server.mjs` follows it.
+- **Addresses** live in `src/lib/config.js` only; the e2e runs replace that file in a copy.
+- **Connecting** goes through the dashboard's `/connect/extension` page. Accept a token only
+  from that page's origin and only with the pending one-time state; never from a URL.
 - **Copy** follows RedirHub's product facts: plans are Core, Pro and Enterprise (no free plan),
   "130 Global PoPs", "99.99% platform uptime" (never an SLA).
 - **Version.** Raise `version` in `manifest.json` for every store upload.

@@ -18,10 +18,18 @@ similar live page seen on the site, else its parent, else the home page).
 **Create redirects** saves the selected rows as 301s in RedirHub;
 **Export CSV** downloads them for the dashboard's bulk import.
 
-Signing in is an API token from account.redirhub.com, pasted on the
-extension's options page. Traces and 404s stay in the browser
-(`chrome.storage`); only the rules the user saves are sent, to the RedirHub API
-(`POST /v1/links`, handler `redirect`).
+**Connecting.** Connect RedirHub opens the dashboard's `/connect/extension` page
+(redirhub/lviv) with a one-time state. The user signs in there if needed, checks the
+workspace and clicks Connect; the dashboard creates an API token for the extension
+(`POST v0.1.3/account/tokens`, redirhub/backend) and posts it to the extension's
+content script with the state. The token never goes in a URL, and is revoked under
+API tokens like any other. Traces and 404s stay in the browser (`chrome.storage`);
+only the rules the user saves or exports leave it, to the RedirHub API.
+
+**Saving.** A rule for a source the workspace already redirects updates that link
+(`PUT /v1/links/{id}`); any other is created (`POST /v1/links`, handler `redirect`,
+the source URL carrying its host). The CSV export has the import template's columns
+(`source URL,destination,type`).
 
 ## Layout
 
@@ -34,7 +42,7 @@ No build step and no dependencies: Chrome loads the folder as it is.
 | `src/content.js` | Reports meta refresh tags; collects a page's links for the link check. |
 | `src/popup.*`, `src/options.*`, `src/ui.css` | The popup and the settings page. |
 | `src/lib/` | Pure logic, unit-tested in `test/` (`npm test`). |
-| `e2e/` | A test site and a run that loads the extension in Chromium and screenshots every state. |
+| `e2e/` | A test site with stand-ins, `run.mjs` (every popup state) and `live.mjs` (a real backend and dashboard). |
 | `scripts/`, `store/` | The store ZIP, the store images and the listing text. |
 
 ## Try it
@@ -42,15 +50,22 @@ No build step and no dependencies: Chrome loads the folder as it is.
 1. `chrome://extensions` → Developer mode → **Load unpacked** → this folder.
 2. Open any page and click the RedirHub icon.
 
-## End-to-end run
+## End-to-end runs
 
 ```bash
-node e2e/server.mjs &        # acme-shop.test on ports 80/443, plus a stand-in RedirHub API
-node e2e/run.mjs /tmp/shots  # Chromium with the extension; prints what each popup said
+node e2e/server.mjs &     # the test site on one port (8443) for HTTP and HTTPS, with stand-ins
+                          # for the API and the dashboard's connect page
+node e2e/run.mjs /tmp/shots    # every popup state, against the stand-ins
+node e2e/live.mjs /tmp/live    # against a real backend and dashboard (below)
 ```
 
-The run resolves `*.test` and `api.redirhub.com` to the local server, so it
-never touches the real API. Signing in uses the token `test-token`.
+`live.mjs` needs redirhub/backend's local copy with the dashboard,
+`.claude/dev-serve.sh --dashboard` (with redirhub/lviv next to it), and
+`source ../backend/storage/dev-env/env.sh` in the shell. It signs in to the
+dashboard, connects the extension, fixes a chain twice (create, then update), saves
+redirects for caught 404s, exports others as a CSV and imports that CSV in the
+dashboard, then checks every link through the API. It prints a JSON report and
+exits 1 when a check fails.
 
 ## Publishing
 

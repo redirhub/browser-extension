@@ -47,13 +47,29 @@ export async function getAccount(token) {
   };
 }
 
-/** Creates one redirect per rule; a failure does not stop the others. */
-export async function createRedirects(token, rules, note) {
+/** The link of the token's workspace that answers for `source` (host and path), or null. */
+async function findLink(token, source) {
+  const body = await call(token, `/links?filter[search]=${encodeURIComponent(source)}&per_page=50`);
+  return (body.data || []).find((link) => link.url === source) || null;
+}
+
+/**
+ * Saves one redirect per rule: a source the workspace already redirects (say, one hop of the chain
+ * is a RedirHub link) is updated, any other is created. A failure does not stop the others.
+ */
+export async function saveRedirects(token, rules, note) {
   const results = [];
   for (const rule of rules) {
+    const body = linkBody(rule, note);
     try {
-      const body = await call(token, "/links", { method: "POST", body: JSON.stringify(linkBody(rule, note)) });
-      results.push({ rule, ok: true, id: body.data?.[0]?.id });
+      const existing = await findLink(token, body.url);
+      if (existing) {
+        await call(token, `/links/${existing.id}`, { method: "PUT", body: JSON.stringify({ destination: body.destination, type: body.type, note }) });
+        results.push({ rule, ok: true, id: existing.id, updated: true });
+      } else {
+        const created = await call(token, "/links", { method: "POST", body: JSON.stringify(body) });
+        results.push({ rule, ok: true, id: created.data?.[0]?.id, updated: false });
+      }
     } catch (error) {
       results.push({ rule, ok: false, error: error.message });
     }
