@@ -128,9 +128,29 @@ export const CATEGORIES = {
   redirect: "Forwards",
   "for-sale": "For sale",
   parked: "Parked",
+  unchecked: "Could not check",
   broken: "Error",
   "no-dns": "No DNS",
 };
+
+/**
+ * Answers that tell about a sign-in wall or a bot check between the checker and the site, not
+ * about the site: such a domain is "could not check", never an error (AGENTS.md).
+ */
+const BLOCKED = {
+  401: "sign-in required",
+  403: "access denied (sign-in or bot protection)",
+  405: "request refused",
+  429: "rate limited",
+};
+const CHALLENGE = /challenge-platform|cf-chl-|<title>Just a moment\.\.\.<\/title>/i;
+
+/** Why an answer says nothing about the site itself (a 503 counts when its page is a challenge), or null. */
+export function blockedReason(status, html = "") {
+  if (BLOCKED[status]) return BLOCKED[status];
+  if (status === 503 && CHALLENGE.test(String(html).slice(0, 200_000))) return "bot check";
+  return null;
+}
 
 /**
  * One verdict per domain.
@@ -141,7 +161,8 @@ export const CATEGORIES = {
 export function classify({ domain, http, https, html }) {
   const flags = [];
   const final = http.final;
-  const httpsBroken = Boolean(https.error) || !https.status || https.status >= 400;
+  // A blocked HTTPS answer says nothing about HTTPS working.
+  const httpsBroken = Boolean(https.error) || !https.status || (https.status >= 400 && !blockedReason(https.status));
   if (https.error && /CERT_|SSL_/.test(https.error)) flags.push(`HTTPS: ${errorLabel(https.error).toLowerCase()}`);
   else if (httpsBroken && final) flags.push(https.error ? `HTTPS: ${errorLabel(https.error).toLowerCase()}` : `HTTPS answers ${https.status}`);
 
@@ -169,6 +190,10 @@ export function classify({ domain, http, https, html }) {
       ? (provider.name ? `For sale on ${provider.name}` : "For sale: a sales page on the domain")
       : (provider.name ? `Parked with ${provider.name}` : "Parked: an ads page on the domain");
     return { category: provider.kind, label, destination: final.url, provider, flags };
+  }
+  const blocked = blockedReason(final.status, html);
+  if (blocked) {
+    return { category: "unchecked", label: `Could not check: ${blocked} (${final.status})`, destination: final.url, provider: null, flags };
   }
   if (final.status >= 400) {
     return { category: "broken", label: `Answers ${final.status}`, destination: final.url, provider: null, flags };

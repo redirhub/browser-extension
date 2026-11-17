@@ -1,14 +1,14 @@
 import { shortUrl } from "./lib/chain.js";
 import { h, plural, toast } from "./lib/dom.js";
-import { CATEGORIES, errorLabel, parseDomains, resultsToCsv } from "./lib/domains.js";
+import { blockedReason, CATEGORIES, errorLabel, parseDomains, resultsToCsv } from "./lib/domains.js";
 import { openSignIn, showGate } from "./lib/gate.js";
 import { icon } from "./lib/icons.js";
 
 const $ = (id) => document.getElementById(id);
 const send = (message) => chrome.runtime.sendMessage(message);
 
-const TONES = { live: "ok", redirect: "redirect", "for-sale": "sale", parked: "warn", broken: "error", "no-dns": "muted" };
-const DOTS = { live: "#20A795", redirect: "#1C6DB6", "for-sale": "#7A5AF8", parked: "#E59426", broken: "#D92D20", "no-dns": "#98A2B3" };
+const TONES = { live: "ok", redirect: "redirect", "for-sale": "sale", parked: "warn", unchecked: "muted", broken: "error", "no-dns": "muted" };
+const DOTS = { live: "#20A795", redirect: "#1C6DB6", "for-sale": "#7A5AF8", parked: "#E59426", unchecked: "#667085", broken: "#D92D20", "no-dns": "#98A2B3" };
 const NOTE = "Forwarded from the RedirHub domain checker.";
 
 const state = {
@@ -135,6 +135,7 @@ function summary() {
 
 function httpsCell(r) {
   if (r.https.error) return h("span", { class: "bad-text" }, errorLabel(r.https.error));
+  if (blockedReason(r.https.status)) return h("span", { class: "muted" }, `Could not check (${r.https.status})`);
   if (r.https.status >= 400) return h("span", { class: "bad-text" }, `Answers ${r.https.status}`);
   return h("span", { class: "ok-text" }, "Works");
 }

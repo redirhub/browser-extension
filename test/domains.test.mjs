@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classify, detectParking, errorLabel, parseDomains, resultsToCsv } from "../src/lib/domains.js";
+import { blockedReason, classify, detectParking, errorLabel, parseDomains, resultsToCsv } from "../src/lib/domains.js";
 
 test("a pasted list becomes clean, unique hostnames", () => {
   const { domains, invalid } = parseDomains(`
@@ -75,4 +75,26 @@ test("network errors read as people say them", () => {
 test("results export as a CSV", () => {
   const csv = resultsToCsv([{ domain: "old-brand.com", category: "redirect", label: "Forwards to new.com", destination: "https://new.com/", final: { status: 200 }, hops: [hop("http://old-brand.com/", 301)], https: { status: 200 }, flags: ["Temporary redirect"], ms: 120 }]);
   assert.equal(csv, "domain,verdict,detail,final URL,final status,redirects,HTTPS,flags,time ms\nold-brand.com,Forwards,Forwards to new.com,https://new.com/,200,301,200,Temporary redirect,120\n");
+});
+
+test("sign-in walls, bot checks and rate limits are 'could not check', never an error", () => {
+  const answer = (status, html = "", https = { status }) => classify({ domain: "guarded.com", http: { hops: [], final: { url: "https://guarded.com/", status } }, https, html });
+
+  for (const status of [401, 403, 405, 429]) {
+    const r = answer(status);
+    assert.equal(r.category, "unchecked", `status ${status}`);
+    assert.deepEqual(r.flags, [], `no HTTPS flag for a blocked ${status}`);
+  }
+  assert.equal(answer(429).label, "Could not check: rate limited (429)");
+  assert.equal(answer(503, "<html><head><title>Just a moment...</title>").label, "Could not check: bot check (503)");
+
+  // Real server errors and missing pages stay errors.
+  assert.equal(answer(503, "<h1>Service Unavailable</h1>", { status: 503 }).category, "broken");
+  assert.equal(answer(500, "", { status: 500 }).category, "broken");
+  assert.equal(answer(404, "", { status: 404 }).category, "broken");
+
+  // A blocked HTTPS answer is not an HTTPS problem.
+  const live = classify({ domain: "shop.com", http: { hops: [], final: { url: "https://shop.com/", status: 200 } }, https: { status: 429 } });
+  assert.deepEqual([live.category, live.flags], ["live", []]);
+  assert.equal(blockedReason(200), null);
 });

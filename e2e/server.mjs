@@ -220,6 +220,10 @@ function portfolio(req, res) {
       return secure ? page(200, lander("premium-name.test", "<h1>premium-name.test</h1><p>This domain is for sale. Make an offer.</p>")) : go(301, "https://premium-name.test/");
     case "ads-parked.test":
       return page(200, lander("ads-parked.test", '<h1>ads-parked.test</h1><p>Related searches</p><script src="https://www.parkingcrew.net/assets/lander.js"></script>'));
+    case "rate-limited.test":
+      // A bot wall: 429 to every request, which says nothing about the site.
+      res.writeHead(429, { "Content-Type": "text/html; charset=utf-8", "Retry-After": "60" });
+      return res.end(lander("Too many requests", "<h1>Too many requests</h1>"));
     case "broken-shop.test":
       return page(500, lander("Error", "<h1>Internal Server Error</h1>"));
     case "plain-http.test":
