@@ -13,21 +13,20 @@ function csvCell(value) {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** rules: [{ source, destination, type }] with absolute URLs. */
+/** rules: [{ source, destination, type }] with absolute URLs, in the columns of RedirHub's import template. */
 export function rulesToCsv(rules) {
-  const lines = ["source,destination,type"];
+  const lines = ["source URL,destination,type"];
   for (const rule of rules) {
     lines.push([sourceOf(rule.source), rule.destination, rule.type || "301"].map(csvCell).join(","));
   }
   return lines.join("\n") + "\n";
 }
 
+/** The body of POST /v1/links for a redirect: the source URL carries its host (a `host` field is refused). */
 export function linkBody(rule, note) {
-  const source = sourceOf(rule.source);
   return {
     handler: "redirect",
-    host: new URL(rule.source).host,
-    url: source,
+    url: sourceOf(rule.source),
     destination: rule.destination,
     type: rule.type || "301",
     note,

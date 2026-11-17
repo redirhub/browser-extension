@@ -17,7 +17,7 @@
     ol { padding-left: 18px; margin: 0 0 14px; color: #344054; }
     ol li { margin: 4px 0; }
     .row { display: flex; gap: 8px; }
-    .error { color: var(--red); margin-top: 8px; }
+    .hint { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
     .who { display: flex; align-items: center; gap: 12px; }
     .who .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 700; }
     .who div { flex: 1; }
@@ -36,22 +36,16 @@
 
     <div class="card" id="connect">
       <h2>Connect your RedirHub account</h2>
-      <p>Needed to create redirects, import 404s in bulk and export rules.</p>
-      <ol>
-        <li><a id="tokens" href="#" target="_blank">Create an API token</a> in your RedirHub account.</li>
-        <li>Paste it here. It is stored in this browser only and sent to the RedirHub API alone.</li>
-      </ol>
-      <form class="row" id="form">
-        <input type="password" id="token" placeholder="Paste your API token" autocomplete="off" required>
-        <button class="btn blue" type="submit">Connect</button>
-      </form>
-      <div class="error" id="error" hidden></div>
+      <p>Needed to create redirects, import 404s in bulk and export rules. RedirHub opens; sign in if
+        you are not, check the workspace and click Connect.</p>
+      <button class="btn primary" id="connect-button" type="button">Connect RedirHub</button>
       <p style="margin:14px 0 0;color:var(--muted)">No account yet? <a id="register" href="#" target="_blank">Create one</a></p>
     </div>
 
     <div class="card" id="connected" hidden>
       <h2>Connected</h2>
       <div class="who"><span class="avatar" id="initials"></span><div><strong id="name"></strong><span id="email"></span></div><button class="btn" id="signout" type="button">Disconnect</button></div>
+      <p class="hint">Disconnect forgets the token in this browser. <a id="tokens" href="#" target="_blank">Revoke it under API tokens</a> to end it for good.</p>
     </div>
 
     <div class="card">

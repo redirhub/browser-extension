@@ -1,17 +1,24 @@
 // Loads the extension in Chromium, browses the test site (server.mjs) and
 // saves screenshots of the popup next to the page it describes.
-//   node e2e/server.mjs &   (ports 80 and 443)
+//   node e2e/server.mjs &
 //   node e2e/run.mjs [outDir]
 import { createRequire } from "node:module";
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { buildExtension } from "./build.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
 
-const extension = resolve(import.meta.dirname, "..");
-const out = resolve(process.argv[2] || join(extension, "e2e", "shots"));
+const root = resolve(import.meta.dirname, "..");
+const out = resolve(process.argv[2] || join(root, "e2e", "shots"));
 mkdirSync(out, { recursive: true });
+const PORT = Number(process.env.E2E_PORT || 8443);
+const extension = buildExtension({
+  API_BASE: "https://api.test/v1",
+  DASHBOARD_URL: "https://dashboard.test",
+  URL_API_TOKENS: "https://account.test/user/api-tokens",
+});
 
 const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "rh-ext-")), {
   channel: "chromium",
@@ -22,7 +29,7 @@ const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir()
   args: [
     `--disable-extensions-except=${extension}`,
     `--load-extension=${extension}`,
-    "--host-resolver-rules=MAP *.test 127.0.0.1, MAP api.redirhub.com 127.0.0.1",
+    `--host-resolver-rules=MAP *.test 127.0.0.1:${PORT}`,
     "--ignore-certificate-errors",
     "--no-proxy-server",
   ],
@@ -67,7 +74,7 @@ async function frame(name, popupShot, badge) {
     .page{display:block;width:1280px;height:740px;object-fit:cover;object-position:top}
     .popup{position:absolute;top:58px;right:14px;width:440px;height:600px;border-radius:10px;box-shadow:0 18px 50px rgba(16,24,40,.35),0 0 0 1px rgba(16,24,40,.12);overflow:hidden}
   </style><div class="bar"><span class="dots"><i></i><i></i><i></i></span><div class="url">${url}</div>
-  <div class="ext"><img src="${img(readFileSync(join(extension, "icons/icon-32.png")))}">${badge.text ? `<span class="badge" style="background:${badge.color}">${badge.text}</span>` : ""}</div></div>
+  <div class="ext"><img src="${img(readFileSync(join(root, "icons/icon-32.png")))}">${badge.text ? `<span class="badge" style="background:${badge.color}">${badge.text}</span>` : ""}</div></div>
   <img class="page" src="${img(pageShot)}"><img class="popup" src="${img(popupShot)}">`);
   await page.screenshot({ path: join(out, `${name}.png`) });
   await page.close();
@@ -142,17 +149,20 @@ report.scan = await popup("5-404-list", {
 // 6. The sign-in gate on "Create redirects".
 report.gate = await popup("6-gate", { view: "404", before: (page) => page.click(".footer .btn.primary") });
 
-// 7. Connect an account on the options page (the API is the stand-in in server.mjs).
+// 7. Connect an account: the options page opens the dashboard's connect page, which hands over a token.
 const options = await context.newPage();
 await options.setViewportSize({ width: 900, height: 760 });
 await options.goto(`${base}/options.html`);
-await options.fill("#token", "wrong-token");
-await options.click("button[type=submit]");
-await options.waitForSelector("#error:not([hidden])");
-report.badToken = await options.locator("#error").innerText();
-await options.fill("#token", "test-token");
-await options.click("button[type=submit]");
+const connectPage = context.waitForEvent("page");
+await options.click("#connect-button");
+const dashboard = await connectPage;
+await dashboard.waitForSelector("#allow:not([disabled])");
+await dashboard.click("#allow");
+await dashboard.waitForFunction(() => /^(Connected|Failed)/.test(document.getElementById("state-line").textContent));
+report.connectPage = await dashboard.locator("#state-line").innerText();
+await dashboard.close();
 await options.waitForSelector("#connected:not([hidden])");
+report.connected = await options.locator("#connected").innerText();
 await options.screenshot({ path: join(out, "7-options.png") });
 await options.close();
 

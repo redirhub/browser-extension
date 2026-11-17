@@ -1,11 +1,11 @@
-// The RedirHub API, signed in with the user's API token.
+// The RedirHub API, signed in with the API token the dashboard gave the extension.
 
+import { API_BASE, DASHBOARD_URL } from "./config.js";
 import { linkBody } from "./rules.js";
 
-export const API_BASE = "https://api.redirhub.com/v1";
-export const URL_API_TOKENS = "https://account.redirhub.com/user/api-tokens";
-export const URL_REGISTER = "https://dash.redirhub.com/login";
-export const URL_DASHBOARD = "https://dash.redirhub.com";
+/** The dashboard page that connects the extension (redirhub/lviv, /connect/extension). */
+export const CONNECT_PATH = "/connect/extension";
+export const URL_REGISTER = `${DASHBOARD_URL}/login`;
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -37,13 +37,13 @@ async function call(token, path, init = {}) {
   return body;
 }
 
+/** The account and workspace the token belongs to. */
 export async function getAccount(token) {
-  const account = await call(token, "/account");
-  const workspace = account.current_workspace;
+  const [account, workspace] = await Promise.all([call(token, "/account"), call(token, "/workspace/current")]);
   return {
     name: account.name,
     email: account.email,
-    workspace: workspace && typeof workspace === "object" ? workspace.name : null,
+    workspace: (workspace.data || workspace).name || null,
   };
 }
 

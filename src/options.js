@@ -1,4 +1,5 @@
-import { URL_API_TOKENS, URL_REGISTER } from "./lib/redirhub.js";
+import { URL_API_TOKENS } from "./lib/config.js";
+import { URL_REGISTER } from "./lib/redirhub.js";
 
 const $ = (id) => document.getElementById(id);
 const send = (message) => chrome.runtime.sendMessage(message);
@@ -15,18 +16,7 @@ function show(account) {
   $("initials").textContent = (account.name || account.email).split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
-$("form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  $("error").hidden = true;
-  const answer = await send({ type: "sign-in", token: $("token").value.trim() });
-  if (!answer.ok) {
-    $("error").textContent = answer.error;
-    $("error").hidden = false;
-    return;
-  }
-  $("token").value = "";
-  show(answer.account);
-});
+$("connect-button").addEventListener("click", () => send({ type: "connect-start" }));
 
 $("signout").addEventListener("click", async () => {
   await send({ type: "sign-out" });
@@ -37,6 +27,11 @@ $("capture").addEventListener("change", (event) => send({ type: "set-settings", 
 $("clear").addEventListener("click", async () => {
   await send({ type: "clear-data" });
   $("clear").textContent = "Cleared";
+});
+
+// The account changes while this page is open when the dashboard connects the extension.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.auth) show(changes.auth.newValue?.account || null);
 });
 
 (async () => {

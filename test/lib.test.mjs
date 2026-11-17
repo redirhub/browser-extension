@@ -52,8 +52,8 @@ test("a 404 is sent to the most similar live page, else its parent, else home", 
 
 test("rules export as RedirHub sources and link bodies", () => {
   const rules = [{ source: "https://www.a.com/old?x=1", destination: "https://www.a.com/new", type: "301" }];
-  assert.equal(rulesToCsv(rules), "source,destination,type\nwww.a.com/old?x=1,https://www.a.com/new,301\n");
+  assert.equal(rulesToCsv(rules), "source URL,destination,type\nwww.a.com/old?x=1,https://www.a.com/new,301\n");
   assert.deepEqual(linkBody(rules[0], "why"), {
-    handler: "redirect", host: "www.a.com", url: "www.a.com/old?x=1", destination: "https://www.a.com/new", type: "301", note: "why",
+    handler: "redirect", url: "www.a.com/old?x=1", destination: "https://www.a.com/new", type: "301", note: "why",
   });
 });

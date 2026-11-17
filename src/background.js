@@ -4,7 +4,8 @@
 
 import { analyzeChain } from "./lib/chain.js";
 import { suggestDestination } from "./lib/suggest.js";
-import { createRedirects, getAccount } from "./lib/redirhub.js";
+import { DASHBOARD_URL } from "./lib/config.js";
+import { CONNECT_PATH, createRedirects, getAccount } from "./lib/redirhub.js";
 
 const FILTER = { urls: ["http://*/*", "https://*/*"], types: ["main_frame"] };
 const KEEP_HEADERS = ["server", "location", "x-redirect-by", "x-powered-by", "cache-control", "non-authoritative-reason"];
@@ -302,6 +303,40 @@ async function paintBadge(tabId, state) {
   }
 }
 
+// ---------- connecting a RedirHub account ----------
+//
+// The extension opens the dashboard's connect page with a one-time state. There the signed-in user
+// clicks Connect; the dashboard creates an API token and posts it, with the state, to this
+// extension's content script, which hands it here. The token never goes in a URL.
+
+const CONNECT_TTL_MS = 15 * 60 * 1000;
+
+async function startConnect() {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  const state = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  await chrome.storage.session.set({ connect: { state, at: Date.now() } });
+  await chrome.tabs.create({ url: `${DASHBOARD_URL}${CONNECT_PATH}?state=${state}` });
+}
+
+/** The pending connection when the message comes from the dashboard's connect page, else null. */
+async function fromConnectPage(sender) {
+  const url = sender.url ? new URL(sender.url) : null;
+  if (!url || url.origin !== new URL(DASHBOARD_URL).origin || url.pathname !== CONNECT_PATH) return null;
+  const { connect } = await chrome.storage.session.get("connect");
+  return connect && Date.now() - connect.at < CONNECT_TTL_MS ? connect : null;
+}
+
+async function finishConnect({ state, token }, sender) {
+  const pending = await fromConnectPage(sender);
+  if (!pending || typeof state !== "string" || state !== pending.state) {
+    throw new Error("This connection request expired. Click Connect in the extension again.");
+  }
+  const account = await getAccount(token);
+  await chrome.storage.local.set({ auth: { token, account } });
+  await chrome.storage.session.remove("connect");
+  return { account };
+}
+
 // ---------- messages from the popup, options page and content script ----------
 
 const handlers = {
@@ -335,11 +370,11 @@ const handlers = {
     const { auth } = await chrome.storage.local.get("auth");
     return { account: auth?.account || null };
   },
-  async "sign-in"({ token }) {
-    const account = await getAccount(token);
-    await chrome.storage.local.set({ auth: { token, account } });
-    return { account };
+  "connect-start": () => startConnect(),
+  async "connect-hello"(_message, sender) {
+    return { waiting: Boolean(await fromConnectPage(sender)) };
   },
+  "connect-token": (message, sender) => finishConnect(message, sender),
   async "sign-out"() {
     await chrome.storage.local.remove("auth");
   },

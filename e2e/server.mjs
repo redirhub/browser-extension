@@ -1,11 +1,17 @@
-// A test site for the extension: acme-shop.test with a redirect chain, client
-// redirects and 404s, and a stand-in for the RedirHub API. Chromium resolves
-// *.test and api.redirhub.com to this server (see run.mjs).
+// A test site for the extension, on one port that speaks HTTP and HTTPS: acme-shop.test with a
+// redirect chain, client redirects and 404s; api.test, a stand-in for the RedirHub API that keeps
+// the real API's rules; dashboard.test, a stand-in for the dashboard's connect page. Chromium maps
+// *.test to this port (see run.mjs).
+//   E2E_PORT=8443 node e2e/server.mjs
 import http from "node:http";
 import https from "node:https";
+import net from "node:net";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+export const PORT = Number(process.env.E2E_PORT || 8443);
+export const TOKEN = "test-token";
 
 const dir = join(import.meta.dirname, ".cert");
 if (!existsSync(join(dir, "key.pem"))) {
@@ -78,12 +84,17 @@ function api(req, res) {
   req.on("data", (chunk) => (body += chunk));
   req.on("end", () => {
     const json = (status, data) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(data)); };
-    if (req.headers.authorization !== "Bearer test-token") return json(401, { message: "Unauthenticated." });
+    if (req.headers.authorization !== `Bearer ${TOKEN}`) return json(401, { message: "Unauthenticated." });
     if (req.method === "GET" && req.url === "/v1/account") {
-      return json(200, { id: "user_test", name: "Kris Brown", email: "kris@acme-shop.test", current_workspace: { name: "Acme Shop" } });
+      return json(200, { id: "user_test", name: "Kris Brown", email: "kris@acme-shop.test", current_workspace: "a33fd9f1-546b-478b-addb-daa9b81d678d" });
+    }
+    if (req.method === "GET" && req.url === "/v1/workspace/current") {
+      return json(200, { data: { id: "a33fd9f1-546b-478b-addb-daa9b81d678d", name: "Acme Shop" } });
     }
     if (req.method === "POST" && req.url === "/v1/links") {
       const link = JSON.parse(body);
+      // As the real API: a redirect's source URL carries its host.
+      if ("host" in link) return json(422, { message: "The host field is prohibited.", errors: { host: ["The host field is prohibited."] } });
       console.log("API POST /v1/links", JSON.stringify(link));
       return json(200, { data: [{ id: `link_${Math.random().toString(36).slice(2, 8)}`, ...link }] });
     }
@@ -91,8 +102,44 @@ function api(req, res) {
   });
 }
 
-const route = (req, res) => (req.headers.host?.startsWith("api.redirhub.com") ? api(req, res) : site(req, res));
+/** The dashboard's /connect/extension page, reduced to its handshake (redirhub/lviv, src/lib/extensionConnect.ts). */
+const CONNECT_PAGE = `<!doctype html><meta charset="utf-8"><title>Connect</title>
+<body style="font:16px system-ui;padding:40px"><h1>Connect the browser extension</h1>
+<p id="state-line">Looking for the extension…</p><button id="allow" disabled>Connect</button>
+<script>
+const state = new URLSearchParams(location.search).get("state");
+const line = document.getElementById("state-line");
+addEventListener("message", (e) => {
+  if (e.source !== window || e.data?.source !== "extension") return;
+  if (e.data.type === "hello") { allow.disabled = false; line.textContent = "Ready"; }
+  if (e.data.type === "connected") line.textContent = "Connected as " + e.data.name + " in " + e.data.workspace;
+  if (e.data.type === "failed") line.textContent = "Failed: " + e.data.error;
+});
+postMessage({ source: "dashboard", type: "ping" }, location.origin);
+allow.onclick = () => postMessage({ source: "dashboard", type: "token", state, token: "${TOKEN}" }, location.origin);
+</script>`;
+
+function dashboard(req, res) {
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(CONNECT_PAGE);
+}
+
+function route(req, res) {
+  const host = req.headers.host || "";
+  if (host.startsWith("api.test")) return api(req, res);
+  if (host.startsWith("dashboard.test")) return dashboard(req, res);
+  return site(req, res);
+}
+
 const tls = { key: readFileSync(join(dir, "key.pem")), cert: readFileSync(join(dir, "cert.pem")) };
-http.createServer(route).listen(Number(process.env.HTTP_PORT || 80));
-https.createServer(tls, route).listen(Number(process.env.HTTPS_PORT || 443));
-console.log("test site ready");
+const plain = http.createServer(route);
+const secure = https.createServer(tls, route);
+// One port for both: a TLS handshake starts with 0x16.
+net.createServer((socket) => {
+  socket.once("data", (first) => {
+    socket.pause();
+    socket.unshift(first);
+    (first[0] === 0x16 ? secure : plain).emit("connection", socket);
+    process.nextTick(() => socket.resume());
+  });
+}).listen(PORT, () => console.log(`test site ready on ${PORT}`));
