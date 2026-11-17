@@ -18,6 +18,14 @@ similar live page seen on the site, else its parent, else the home page).
 **Create redirects** saves the selected rows as 301s in RedirHub;
 **Export CSV** downloads them for the dashboard's bulk import.
 
+**Domains.** A full-page checker for domain portfolios (`src/domains.html`, also from
+the popup's Domains tab): paste up to 1,000 domains and each one is requested from the
+browser, without cookies, over HTTP and HTTPS. It shows where each domain goes (with
+every redirect), whether HTTPS works, and whether it is parked or for sale (Sedo, Dan,
+Afternic, HugeDomains, GoDaddy, Atom, ParkingCrew, Bodis and others, by address, then by
+the page). Filters by verdict and HTTPS issues; **Export CSV** and **Forward** (one 301
+per selected domain to an address, as whole-domain links in RedirHub) need an account.
+
 **Connecting.** The extension signs in the way MCP clients such as Claude do, with
 RedirHub's existing OAuth 2.1 server (redirhub/backend, `app/Mcp/OAuth`): it discovers
 the authorization server from the MCP server, registers itself as a public client
@@ -44,6 +52,7 @@ No build step and no dependencies: Chrome loads the folder as it is.
 | `manifest.json` | Permissions: `webRequest`, `webNavigation`, `storage`, `identity`, all hosts. |
 | `src/background.js` | Service worker: builds chains from webRequest/webNavigation, catches 404s, checks links, calls RedirHub (refreshing the token). |
 | `src/connect.js` | The OAuth sign-in, run from the options page. |
+| `src/domains.*` | The domain checker page; the requests run in the background script. |
 | `src/content.js` | Reports meta refresh tags; collects a page's links for the link check. |
 | `src/popup.*`, `src/options.*`, `src/ui.css` | The popup and the settings page. |
 | `src/lib/` | Pure logic, unit-tested in `test/` (`npm test`). |

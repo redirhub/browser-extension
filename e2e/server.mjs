@@ -9,6 +9,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { PORTFOLIO } from "./portfolio.mjs";
 
 export const PORT = Number(process.env.E2E_PORT || 8443);
 
@@ -200,10 +201,40 @@ async function api(req, res) {
   }
 }
 
+// ---------- a stand-in domain portfolio, one domain per verdict of the domain checker ----------
+
+const lander = (title, body) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:16px system-ui;padding:40px">${body}`;
+
+function portfolio(req, res) {
+  const host = (req.headers.host || "").split(":")[0];
+  const secure = req.socket.encrypted;
+  const go = (status, location) => { res.writeHead(status, { Location: location, Server: "nginx" }); res.end(); };
+  const page = (status, html) => { res.writeHead(status, { "Content-Type": "text/html; charset=utf-8", Server: "nginx" }); res.end(html); };
+  switch (host) {
+    case "live-widgets.test":
+      return secure ? page(200, lander("Live Widgets", "<h1>Live Widgets</h1><p>Hand-made widgets.</p>")) : go(301, "https://live-widgets.test/");
+    case "old-brand.test":
+      // A retired brand: a temporary redirect, then to the new site.
+      return secure ? go(301, "https://www.acme-shop.test/") : go(302, "https://old-brand.test/");
+    case "premium-name.test":
+      return secure ? page(200, lander("premium-name.test", "<h1>premium-name.test</h1><p>This domain is for sale. Make an offer.</p>")) : go(301, "https://premium-name.test/");
+    case "ads-parked.test":
+      return page(200, lander("ads-parked.test", '<h1>ads-parked.test</h1><p>Related searches</p><script src="https://www.parkingcrew.net/assets/lander.js"></script>'));
+    case "broken-shop.test":
+      return page(500, lander("Error", "<h1>Internal Server Error</h1>"));
+    case "plain-http.test":
+      // Answers on HTTP only: HTTPS gets a 404.
+      return secure ? page(404, lander("Not found", "Not found")) : page(200, lander("Plain HTTP", "<h1>Plain HTTP</h1>"));
+    default:
+      return page(404, lander("Not found", "Not found"));
+  }
+}
+
 function route(req, res) {
   const host = req.headers.host || "";
   if (host.startsWith("api.test")) return api(req, res);
   if (host.startsWith("account.test")) return account(req, res);
+  if (PORTFOLIO.includes(host.split(":")[0])) return portfolio(req, res);
   return site(req, res);
 }
 

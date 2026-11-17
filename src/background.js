@@ -3,6 +3,7 @@
 // Everything stays in the browser until the user exports or imports it.
 
 import { analyzeChain } from "./lib/chain.js";
+import { classify } from "./lib/domains.js";
 import { suggestDestination } from "./lib/suggest.js";
 import { callTool } from "./lib/mcp.js";
 import { needsRefresh, refreshTokens } from "./lib/oauth.js";
@@ -304,6 +305,124 @@ async function paintBadge(tabId, state) {
   }
 }
 
+// ---------- domain checker ----------
+//
+// The domains page (src/domains.js) sends a list over a port; each domain gets two requests from
+// here, without cookies: http://domain/ (the chain, where it ends up, the start of its page) and
+// https://domain/ (does HTTPS work). webRequest sees this worker's own requests (tabId -1), which
+// is how the hops are known: fetch only tells where a chain ended.
+
+const CHECK_FILTER = { urls: ["http://*/*", "https://*/*"], types: ["xmlhttprequest"] };
+const CHECK_CONCURRENCY = 6;
+const CHECK_TIMEOUT_MS = 15000;
+const PAGE_SAMPLE_BYTES = 150_000;
+
+/** Traces waiting for their first request, by URL; then by requestId. */
+const awaitingTrace = new Map();
+const traces = new Map();
+
+chrome.webRequest.onBeforeRequest.addListener((details) => {
+  if (details.tabId !== -1 || traces.has(details.requestId)) return;
+  const trace = awaitingTrace.get(details.url);
+  if (!trace) return;
+  awaitingTrace.delete(details.url);
+  traces.set(details.requestId, trace);
+}, CHECK_FILTER);
+
+chrome.webRequest.onBeforeRedirect.addListener((details) => {
+  const trace = traces.get(details.requestId);
+  if (trace && !trace.done) trace.hops.push({ url: details.url, status: details.statusCode, to: details.redirectUrl });
+}, CHECK_FILTER);
+
+chrome.webRequest.onErrorOccurred.addListener((details) => {
+  const trace = traces.get(details.requestId);
+  traces.delete(details.requestId);
+  if (trace && !trace.done) trace.error = details.error;
+}, CHECK_FILTER);
+
+chrome.webRequest.onCompleted.addListener((details) => traces.delete(details.requestId), CHECK_FILTER);
+
+const until = async (test, ms) => {
+  for (const end = Date.now() + ms; !test() && Date.now() < end;) await new Promise((r) => setTimeout(r, 25));
+};
+
+async function readSample(response) {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let text = "";
+  while (text.length < PAGE_SAMPLE_BYTES) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+  }
+  reader.cancel().catch(() => {});
+  return text;
+}
+
+/** One request, followed to its end, with every hop it went through. */
+async function tracedFetch(url, { sample }) {
+  const trace = { hops: [], final: null, error: null, done: false };
+  awaitingTrace.set(url, trace);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+  const started = performance.now();
+  let html = "";
+  try {
+    const response = await fetch(url, { credentials: "omit", cache: "no-store", redirect: "follow", signal: controller.signal });
+    // The redirect events may still be on their way.
+    await until(() => !response.redirected || trace.hops.at(-1)?.to === response.url, 500);
+    trace.final = { url: response.url, status: response.status };
+    html = sample ? await readSample(response) : "";
+    if (!sample) response.body?.cancel().catch(() => {});
+  } catch {
+    if (controller.signal.aborted) {
+      trace.error = "net::ERR_TIMED_OUT";
+    } else {
+      // The error itself (no DNS, a certificate) comes with webRequest's event.
+      await until(() => trace.error, 500);
+      trace.error ||= "net::ERR_FAILED";
+    }
+  } finally {
+    trace.done = true;
+    clearTimeout(timer);
+    awaitingTrace.delete(url);
+  }
+  return { hops: trace.hops, final: trace.final, error: trace.final ? null : trace.error, html, ms: Math.round(performance.now() - started) };
+}
+
+async function checkDomain(domain) {
+  const http = await tracedFetch(`http://${domain}/`, { sample: true });
+  const https = await tracedFetch(`https://${domain}/`, { sample: false });
+  const httpsResult = { status: https.final?.status, error: https.error };
+  const verdict = classify({ domain, http, https: httpsResult, html: http.html });
+  return { domain, ...verdict, hops: http.hops.map(({ url, status }) => ({ url, status })), final: http.final, https: httpsResult, ms: http.ms };
+}
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "domain-check") return;
+  let stopped = false;
+  port.onDisconnect.addListener(() => (stopped = true));
+  port.onMessage.addListener(async ({ domains }) => {
+    const queue = [...domains];
+    const results = [];
+    const at = Date.now();
+    async function worker() {
+      while (queue.length && !stopped) {
+        const result = await checkDomain(queue.shift());
+        results.push(result);
+        if (!stopped) port.postMessage({ type: "result", result, done: results.length, total: domains.length });
+      }
+    }
+    await Promise.all(Array.from({ length: CHECK_CONCURRENCY }, worker));
+    // Keep the run in the order it was asked for, for the next time the page opens.
+    const order = new Map(domains.map((domain, i) => [domain, i]));
+    results.sort((a, b) => order.get(a.domain) - order.get(b.domain));
+    await chrome.storage.local.set({ domainCheck: { at, complete: !stopped, results } });
+    if (!stopped) port.postMessage({ type: "finished" });
+  });
+});
+
 // ---------- the RedirHub connection ----------
 //
 // The options page signs in (src/connect.js) and hands the tokens here. Every call to RedirHub
@@ -386,7 +505,7 @@ const handlers = {
   },
   async "clear-data"() {
     const all = await chrome.storage.local.get(null);
-    await chrome.storage.local.remove(Object.keys(all).filter((k) => k.startsWith("nf:") || k.startsWith("live:")));
+    await chrome.storage.local.remove(Object.keys(all).filter((k) => k.startsWith("nf:") || k.startsWith("live:") || k === "domainCheck"));
   },
 };
 

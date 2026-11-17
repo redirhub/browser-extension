@@ -36,14 +36,20 @@ WHAT IT FLAGS
 • "Check the links on this page" tests every link of the page you are on to the same site: broken links, and links that go through a redirect with where they end up
 • Each 404 comes with a suggested destination: the most similar live page of the site, its parent, or the home page
 
+DOMAIN CHECKER, FOR DOMAIN PORTFOLIOS
+• Paste up to 1,000 domains and check them all at once, from your browser
+• For each: where it goes and through which redirects, whether HTTPS works, and whether it is parked or for sale (Sedo, Dan, Afternic, HugeDomains, GoDaddy and more)
+• Filter by verdict to find the domains that are down, parked or forwarding with a temporary redirect
+
 FIX IT IN REDIRHUB
 Checks are free and need no account. Connect a RedirHub account (you sign in on RedirHub and choose what the extension may do) to:
 • Replace a whole chain with one 301 in a click
 • Create 301s for the 404s you caught, in bulk
 • Export them as a CSV for RedirHub's bulk import
+• Forward idle domains from the domain checker to your site with one 301 each, and export the checker's results
 
 PRIVACY
-Traces and caught 404s stay in your browser. Nothing is sent anywhere until you save or export a rule; saved rules go to the RedirHub API only. You can turn off 404 catching and clear the data at any time.
+Traces, caught 404s and domain checks stay in your browser. The domain checker requests each domain you list directly, without cookies. Nothing is sent to RedirHub until you save, forward or export; you can turn off 404 catching and clear the data at any time.
 ```
 
 **Images** (in `store/`): `screenshot-1.png` … `screenshot-5.png` (1280×800),
@@ -57,7 +63,7 @@ Traces and caught 404s stay in your browser. Nothing is sent anywhere until you 
 **Single purpose:**
 
 ```
-Shows the redirects and 404 errors of the pages the user visits, and lets the user turn them into redirect rules in their RedirHub account.
+Shows the redirects and 404 errors of the pages the user visits and of the domains the user lists, and lets the user turn them into redirect rules in their RedirHub account.
 ```
 
 **Permission justifications:**
@@ -68,7 +74,7 @@ Shows the redirects and 404 errors of the pages the user visits, and lets the us
 | `webNavigation` | Tells whether a navigation was started by a meta refresh or a script, so client-side redirects are shown as part of the chain. |
 | `storage` | Keeps the chain of each open tab, the 404s caught per site, the settings and the user's RedirHub sign-in (OAuth tokens), in the browser. |
 | `identity` | Opens RedirHub's sign-in and consent screen (`chrome.identity.launchWebAuthFlow`) and receives the authorization code when the user allows access. |
-| Host permissions (`<all_urls>`) | Redirects cross sites (HTTP to HTTPS, one domain to another), so the extension must observe whatever site the user opens. The link check requests the links of the current page, and saving rules calls RedirHub's MCP server. |
+| Host permissions (`<all_urls>`) | Redirects cross sites (HTTP to HTTPS, one domain to another), so the extension must observe whatever site the user opens. The link check requests the links of the current page, the domain checker requests the domains the user lists, and saving rules calls RedirHub's MCP server. |
 | Content script on all sites | Detects a meta refresh tag on the page, and lists the page's links when the user asks for a link check. |
 
 **Remote code:** No, I am not using remote code. (All code ships in the package.)
@@ -95,7 +101,7 @@ RedirHub browser extension
 
 The RedirHub Redirect Path & 404 Catcher extension shows the redirects and 404 errors of the pages you open in Chrome.
 
-What stays in your browser. To work, the extension reads the addresses, status codes and redirect headers of the pages you open, and the links of a page when you ask it to check them. This information, the 404 errors it catches and your settings are stored in your browser only. Redirect traces are deleted when you close the tab; caught 404 errors stay until you clear them in the extension's settings or remove the extension. We do not receive this information.
+What stays in your browser. To work, the extension reads the addresses, status codes and redirect headers of the pages you open, the links of a page when you ask it to check them, and the answers of the domains you list in its domain checker, which it requests from your browser without cookies. This information, the 404 errors it catches and your settings are stored in your browser only. Redirect traces are deleted when you close the tab; caught 404 errors stay until you clear them in the extension's settings or remove the extension. We do not receive this information.
 
 What is sent to RedirHub. If you connect your RedirHub account, you sign in on RedirHub and choose the workspace and what the extension may do; the extension keeps the sign-in tokens RedirHub gives it in your browser and sends them only to RedirHub to identify you. When you choose to save or export redirect rules, the addresses in those rules are sent to your RedirHub account and handled under this policy like any other redirect you create.
 

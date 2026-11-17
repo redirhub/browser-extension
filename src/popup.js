@@ -1,27 +1,13 @@
 import { hopTone, shortUrl, statusLabel, statusText } from "./lib/chain.js";
 import { rulesToCsv } from "./lib/rules.js";
-import { URL_REGISTER } from "./lib/redirhub.js";
+import { h, plural, toast } from "./lib/dom.js";
+import { openSignIn, showGate } from "./lib/gate.js";
 import { icon } from "./lib/icons.js";
 
 const $ = (id) => document.getElementById(id);
 const send = (message) => chrome.runtime.sendMessage(message);
 
-const state = { tab: null, account: null, chain: null, notFound: [], scan: null, gateAction: null };
-
-function h(tag, attrs = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (value == null || value === false) continue;
-    if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
-    else if (key === "class") el.className = value;
-    else el.setAttribute(key, value === true ? "" : value);
-  }
-  for (const child of children.flat()) {
-    if (child == null || child === false) continue;
-    el.append(child instanceof Node ? child : document.createTextNode(String(child)));
-  }
-  return el;
-}
+const state = { tab: null, account: null, chain: null, notFound: [], scan: null };
 
 function urlParts(url) {
   try {
@@ -32,16 +18,7 @@ function urlParts(url) {
   }
 }
 
-function toast(text, tone = "") {
-  const el = $("toast");
-  el.textContent = text;
-  el.className = `toast ${tone}`;
-  el.hidden = false;
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (el.hidden = true), 4000);
-}
 
-const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const stripHash = (url) => url.split("#")[0];
 
 // ---------- account ----------
@@ -62,9 +39,7 @@ function renderAccount() {
 
 function requireAccount(title, action) {
   if (state.account) return action();
-  state.gateAction = action;
-  $("gate-title").textContent = title;
-  $("gate").hidden = false;
+  showGate(title, { afterOpen: () => window.close() });
 }
 
 // ---------- redirects ----------
@@ -324,12 +299,38 @@ function renderFooter() {
 
 // ---------- shell ----------
 
+const TABS = ["chain", "404", "domains"];
+
 function selectTab(name) {
-  const chain = name === "chain";
-  $("tab-chain").setAttribute("aria-selected", chain);
-  $("tab-404").setAttribute("aria-selected", !chain);
-  $("view-chain").hidden = !chain;
-  $("view-404").hidden = chain;
+  for (const tab of TABS) {
+    $(`tab-${tab}`).setAttribute("aria-selected", tab === name);
+    $(`view-${tab}`).hidden = tab !== name;
+  }
+}
+
+// ---------- domains ----------
+
+const openDomainChecker = () => chrome.tabs.create({ url: chrome.runtime.getURL("src/domains.html") }).then(() => window.close());
+
+async function renderDomains() {
+  const { domainCheck } = await chrome.storage.local.get("domainCheck");
+  const results = domainCheck?.results || [];
+  const count = (category) => results.filter((r) => r.category === category).length;
+  const last = results.length
+    ? h("div", { class: "domains-last" },
+      h("div", { class: "label" }, `Last check · ${new Date(domainCheck.at).toLocaleDateString("en", { day: "numeric", month: "short" })}`),
+      h("div", { class: "domains-counts" },
+        [["Domains", results.length], ["Forward", count("redirect")], ["For sale", count("for-sale")], ["Parked", count("parked")], ["Errors", count("broken") + count("no-dns")]]
+          .map(([label, n]) => h("div", {}, h("b", {}, n.toLocaleString("en")), h("span", {}, label)))))
+    : null;
+  $("view-domains").replaceChildren(
+    h("div", { class: "domains-intro" },
+      h("h2", {}, "Check a whole portfolio"),
+      h("p", {}, "Paste up to 1,000 domains and see, for each one, where it goes, whether HTTPS works and whether it is parked or for sale."),
+    ),
+    last,
+    h("button", { class: "btn primary wide", type: "button", onclick: openDomainChecker }, results.length ? "Open the domain checker" : "Check a list of domains"),
+  );
 }
 
 async function activeTab() {
@@ -347,20 +348,14 @@ async function main() {
   renderAccount();
   renderChain();
   renderNotFound();
+  renderDomains();
 
   const view = new URLSearchParams(location.search).get("view");
   const last = chain.hops[chain.hops.length - 1];
   selectTab(view || (last && last.status >= 400 && state.notFound.length && chain.analysis.redirects === 0 ? "404" : "chain"));
 
-  $("tab-chain").onclick = () => selectTab("chain");
-  $("tab-404").onclick = () => selectTab("404");
-  // Signing in runs on the options page, which stays open while the user is on RedirHub.
-  const connect = () => chrome.tabs.create({ url: chrome.runtime.getURL("src/options.html#connect") }).then(() => window.close());
-  $("account").onclick = () => (state.account ? chrome.runtime.openOptionsPage() : connect());
-  $("gate-connect").onclick = connect;
-  $("gate-register").onclick = () => chrome.tabs.create({ url: URL_REGISTER });
-  $("gate-close").onclick = () => ($("gate").hidden = true);
-  $("gate-icon").append(icon("lock", 22));
+  for (const tab of TABS) $(`tab-${tab}`).onclick = () => selectTab(tab);
+  $("account").onclick = () => (state.account ? chrome.runtime.openOptionsPage() : openSignIn().then(() => window.close()));
 }
 
 main();
