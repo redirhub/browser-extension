@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RedirHub</title>
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="bar">
+    <img class="logo" src="../icons/icon-32.png" alt="">
+    <div class="brand"><strong>RedirHub</strong><span>Redirect Path &amp; 404s</span></div>
+    <button class="account" id="account" type="button"></button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-chain" aria-selected="true">Redirects</button>
+    <button role="tab" id="tab-404" aria-selected="false">404s <span class="count" id="nf-count" hidden></span></button>
+  </nav>
+
+  <main>
+    <section id="view-chain"></section>
+    <section id="view-404" hidden></section>
+  </main>
+
+  <div class="gate" id="gate" hidden>
+    <div class="gate-card" role="dialog" aria-labelledby="gate-title">
+      <div class="gate-icon">🔒</div>
+      <h2 id="gate-title"></h2>
+      <p>The checks stay free. Connect your RedirHub account to save fixes as live redirects, import 404s in bulk and export rules.</p>
+      <ul>
+        <li>One-click 301s served from 130 Global PoPs</li>
+        <li>Bulk-import every 404 you caught</li>
+        <li>Change rules later without touching server configs</li>
+      </ul>
+      <div class="row">
+        <button class="btn primary" id="gate-connect" type="button">Connect RedirHub</button>
+        <button class="btn" id="gate-register" type="button">Create an account</button>
+      </div>
+      <button class="link" id="gate-close" type="button">Not now</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

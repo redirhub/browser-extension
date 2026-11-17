@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RedirHub extension settings</title>
+  <link rel="stylesheet" href="ui.css">
+  <style>
+    body { background: var(--wash); }
+    .wrap { max-width: 560px; margin: 40px auto; padding: 0 20px; }
+    .head { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+    .head img { width: 36px; height: 36px; border-radius: 8px; }
+    .head h1 { font-size: 20px; margin: 0; }
+    .head p { margin: 0; color: var(--muted); }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; margin: 0 0 4px; }
+    .card > p { color: #475467; margin: 0 0 14px; }
+    ol { padding-left: 18px; margin: 0 0 14px; color: #344054; }
+    ol li { margin: 4px 0; }
+    .row { display: flex; gap: 8px; }
+    .error { color: var(--red); margin-top: 8px; }
+    .who { display: flex; align-items: center; gap: 12px; }
+    .who .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 700; }
+    .who div { flex: 1; }
+    .who span { color: var(--muted); display: block; }
+    .setting { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); }
+    .setting:first-of-type { border-top: 0; }
+    .setting span { color: var(--muted); display: block; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <img src="../icons/icon-128.png" alt="">
+      <div><h1>RedirHub Redirect Path &amp; 404s</h1><p>Checks are free. An account saves fixes as live redirects.</p></div>
+    </div>
+
+    <div class="card" id="connect">
+      <h2>Connect your RedirHub account</h2>
+      <p>Needed to create redirects, import 404s in bulk and export rules.</p>
+      <ol>
+        <li><a id="tokens" href="#" target="_blank">Create an API token</a> in your RedirHub account.</li>
+        <li>Paste it here. It is stored in this browser only and sent to the RedirHub API alone.</li>
+      </ol>
+      <form class="row" id="form">
+        <input type="password" id="token" placeholder="Paste your API token" autocomplete="off" required>
+        <button class="btn blue" type="submit">Connect</button>
+      </form>
+      <div class="error" id="error" hidden></div>
+      <p style="margin:14px 0 0;color:var(--muted)">No account yet? <a id="register" href="#" target="_blank">Create one</a></p>
+    </div>
+
+    <div class="card" id="connected" hidden>
+      <h2>Connected</h2>
+      <div class="who"><span class="avatar" id="initials"></span><div><strong id="name"></strong><span id="email"></span></div><button class="btn" id="signout" type="button">Disconnect</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Privacy</h2>
+      <div class="setting"><div>Catch 404s while I browse<span>Pages that answer 404 or 410 are listed per site, in this browser only.</span></div><label class="switch"><input type="checkbox" id="capture"><span></span></label></div>
+      <div class="setting"><div>Clear caught 404s and seen pages<span>Redirect traces are forgotten when a tab closes.</span></div><button class="btn" id="clear" type="button">Clear</button></div>
+    </div>
+  </div>
+  <script type="module" src="options.js"></script>
+</body>
+</html>
