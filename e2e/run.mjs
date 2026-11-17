@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildExtension } from "./build.mjs";
-import { PORTFOLIO } from "./portfolio.mjs";
+import { EXPECTED, PORTFOLIO } from "./portfolio.mjs";
 import { extensionSession } from "./session.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -141,6 +141,8 @@ report.domains = Object.fromEntries(await checker.$$eval("#rows tr", (rows) => r
   [...tr.querySelectorAll("td")].slice(2).map((td) => td.innerText.replace(/\s+/g, " ").trim()).join(" | "),
 ])));
 await checker.screenshot({ path: join(out, "10-domains.png"), fullPage: true });
+const verdicts = Object.fromEntries(await checker.$$eval("#rows tr", (rows) => rows.map((tr) => [tr.dataset.domain, tr.querySelector(".pill")?.textContent])));
+report.wrongVerdicts = Object.entries(EXPECTED).filter(([domain, verdict]) => verdicts[domain] !== verdict).map(([domain, verdict]) => `${domain}: ${verdicts[domain]}, expected ${verdict}`);
 
 // 11. Forward the parked and for-sale ones (signed in since step 7).
 for (const domain of ["premium-name.test", "ads-parked.test"]) await checker.check(`tr[data-domain="${domain}"] input`);
@@ -157,4 +159,8 @@ await checker.close();
 report.domainsTab = await popup("13-popup-domains", { view: "domains" });
 
 console.log(JSON.stringify(report, null, 2));
+if (report.wrongVerdicts.length) {
+  console.error(`Wrong verdicts:\n${report.wrongVerdicts.join("\n")}`);
+  process.exitCode = 1;
+}
 await context.close();

@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildExtension } from "./build.mjs";
-import { PORTFOLIO } from "./portfolio.mjs";
+import { EXPECTED, PORTFOLIO } from "./portfolio.mjs";
 import { extensionSession } from "./session.mjs";
 
 const { chromium } = createRequire(import.meta.url)("playwright");
@@ -213,7 +213,7 @@ await checker.fill("#list", PORTFOLIO.join("\n"));
 await checker.click("#run");
 await checker.waitForSelector("#progress[hidden]", { state: "attached", timeout: 120000 });
 const verdicts = Object.fromEntries(await checker.$$eval("#rows tr", (rows) => rows.map((tr) => [tr.dataset.domain || tr.querySelector(".domain").textContent, tr.querySelector(".pill")?.textContent])));
-check("portfolio verdicts", verdicts["premium-name.test"] === "For sale" && verdicts["ads-parked.test"] === "Parked" && verdicts["gone-domain.test"] === "No DNS" && verdicts["old-brand.test"] === "Forwards", verdicts);
+check("portfolio verdicts", Object.entries(EXPECTED).every(([domain, verdict]) => verdicts[domain] === verdict), verdicts);
 const idle = ["premium-name.test", "ads-parked.test"];
 for (const domain of idle) await checker.check(`tr[data-domain="${domain}"] input`);
 await checker.click("#forward");

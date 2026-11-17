@@ -23,7 +23,8 @@ the popup's Domains tab): paste up to 1,000 domains and each one is requested fr
 browser, without cookies, over HTTP and HTTPS. It shows where each domain goes (with
 every redirect), whether HTTPS works, and whether it is parked or for sale (Sedo, Dan,
 Afternic, HugeDomains, GoDaddy, Atom, ParkingCrew, Bodis and others, by address, then by
-the page). Filters by verdict and HTTPS issues; **Export CSV** and **Forward** (one 301
+the page). A sign-in wall, bot check or rate limit (401, 403, 405, 429, a challenge
+page) is "Could not check", never an error. Filters by verdict and HTTPS issues; **Export CSV** and **Forward** (one 301
 per selected domain to an address, as whole-domain links in RedirHub) need an account.
 
 **Connecting.** The extension signs in the way MCP clients such as Claude do, with

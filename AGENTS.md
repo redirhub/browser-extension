@@ -50,8 +50,10 @@ Every behaviour change comes with a unit test (pure logic in `src/lib/`) or an e
   domain checker sends no cookies at all (`credentials: "omit"`).
 - **Parking and sales services are named only on evidence:** the final address or a script or
   phrase in the page (`src/lib/domains.js`). A new provider comes with a unit test.
-- **Only 404 and 410 are "missing".** Login walls and bot checks (403, 405, …) are reported as
-  "could not be checked", never as broken.
+- **Only 404 and 410 are "missing".** Login walls, bot checks and rate limits (401, 403, 405,
+  429, a challenge page's 503) are reported as "could not be checked", never as broken: in the
+  link check, and in the domain checker as "Could not check" (`blockedReason` in
+  `src/lib/domains.js`). A real server error stays an error.
 - **RedirHub, through MCP and OAuth only.** The extension signs in with RedirHub's OAuth
   server (PKCE, refresh tokens, scopes `links:read` and `links:write`) and calls MCP tools.
   No API tokens, no second sign-in path, no extra scopes without a feature that needs them.
